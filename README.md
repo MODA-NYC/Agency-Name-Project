@@ -7,4 +7,4 @@ This project is being developed by the Data Governance team in the Office of Dat
 *The word “Agency” is colloquially used to mean a government organization that includes a New York City Agency, a Mayoral Office, or a Commission.
 
 Project Plan document: [NYC Agency Name Project](https://docs.google.com/document/d/1u9-sZXUWdand1yIRmmKGbq7D5RAgD2puWoYvbP06a4g/edit?usp=sharing)
-Code Notebook: [Agency Name Project.ipynb](https://colab.research.google.com/drive/1BzU2_8sAOsIZWr_9fS5JaM2-MUrPt7eg?usp=sharing)
+Code Notebook originally developed as a Google CoLab project: [Agency Name Project.ipynb](https://colab.research.google.com/drive/1BzU2_8sAOsIZWr_9fS5JaM2-MUrPt7eg?usp=sharing)

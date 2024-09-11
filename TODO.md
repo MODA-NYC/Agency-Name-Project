@@ -1,0 +1,24 @@
+- [ ] Follow up meeting with nyc.gov
+- [ ] Crosswalk to nyc.gov datasets
+- [ ] Add Head of Organization Contact Link
+- [ ] Revise output structure for v1 based on conversation with Laura
+- [ ] Send crosswalk with Ops data to Ops
+- [ ] Look into FISA-OPA list
+- [ ] Look into EEO Officers list (DCAS)
+- [ ] Check in with DORIS archives team
+- [ ] Contact Library of Congress re Authorities catalog
+- [ ] Add crosswalk to NYCAPS agency name list (use Jobs NYC Postings as reference)
+  - What about orgs that don’t have a current listing?
+- [ ] Crosswalk based on Civil Service List Certification dataset (has 5m records, with an Agency column and Agency Code column)
+- [ ] Check City Record Online dataset
+- [ ] Check Civil List (2m records, with Agency Name and Agency Code)
+- [ ] Consider Charter Mandated Quarterly Report on Provisionals (might not be needed)
+- [ ] Check in with NYCEM
+- [ ] Check in with Phil re Fed standards
+- [ ] Check in with Devin re Org Chart
+- [ ] Decide about orgs with multiple Instances Of
+- [ ] Maintenance issue of changing URL structures of Charter
+- [ ] Decide on final order of the columns
+- [ ] Create Maintenance Plan
+- [ ] Make final data dictionary - align to Open Data and MetaCat
+- [ ] Clean up documentation

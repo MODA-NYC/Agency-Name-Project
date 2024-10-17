@@ -41,6 +41,13 @@ def main(data_dir, log_level, display, save):
     ops_data_path = get_file_path(data_dir, 'raw', 'ops_data.csv')
     ops_data = load_csv_data(ops_data_path)
 
+    # Remove rows where 'Name' is null in nyc_agencies_export
+    nyc_agencies_export = nyc_agencies_export[nyc_agencies_export['Name'].notnull()]
+
+    # Remove rows where 'Agency Name' is null in nyc_gov_hoo and ops_data
+    nyc_gov_hoo = nyc_gov_hoo[nyc_gov_hoo['Agency Name'].notnull()]
+    ops_data = ops_data[ops_data['Agency Name'].notnull()]
+
     # Preprocess nyc_gov_hoo
     nyc_gov_hoo = preprocess_nyc_gov_hoo(nyc_gov_hoo)
 

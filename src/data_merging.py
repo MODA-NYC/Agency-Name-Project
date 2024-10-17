@@ -1,6 +1,6 @@
 import pandas as pd
 
-def merge_dataframes(primary_df, secondary_dfs, on_column='NameNormalized', how='left'):
+def merge_dataframes(primary_df, secondary_dfs, on_column='NameNormalized', how='outer'):
     """
     Merge multiple dataframes based on a specified column.
     
@@ -8,7 +8,7 @@ def merge_dataframes(primary_df, secondary_dfs, on_column='NameNormalized', how=
     primary_df (pandas.DataFrame): The primary dataframe to merge onto
     secondary_dfs (list): List of tuples (dataframe, fields_to_keep, prefix)
     on_column (str): Column to merge on (default: 'NameNormalized')
-    how (str): Type of merge to perform (default: 'left')
+    how (str): Type of merge to perform (default: 'outer')
     
     Returns:
     pandas.DataFrame: Merged dataframe

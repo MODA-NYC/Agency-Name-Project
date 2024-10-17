@@ -119,7 +119,8 @@ new_fields_definitions = {
     'HeadOfOrganizationTitle': "The title of the head of the organization.",
     'HeadOfOrganizationURL': "The contact URL for the head of the organization.",
     'MMRChapter': "Indicates if the organization has a chapter in the Mayor's Management Report.",
-    'RulemakingEntity': "Indicates whether the organization is a rulemaking entity."
+    'RulemakingEntity': "Indicates whether the organization is a rulemaking entity.",
+    'Name - NYC.gov Redesign - Original Value': "The original 'Agency Name' from the NYC.gov dataset before any modifications."  # Add this line
 }
 
 # Prepare new definitions as a DataFrame

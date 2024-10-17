@@ -73,7 +73,14 @@ def main(data_dir, log_level, display, save):
         logging.info("All datasets loaded and normalized successfully.")
         
         # Prepare secondary dataframes for merging
-        nyc_gov_fields = ['Agency Name', 'Head of Organization ', 'HoO Title', 'HoO Contact Link', 'Agency Link (URL)']
+        nyc_gov_fields = [
+            'Agency Name',
+            'Head of Organization ',
+            'HoO Title',
+            'HoO Contact Link',
+            'Agency Link (URL)',
+            'Name - NYC.gov Redesign - Original Value'  # Include the new field here
+        ]
         ops_data_fields = ['Agency Name']
         
         secondary_dfs = [

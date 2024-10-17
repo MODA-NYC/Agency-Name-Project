@@ -1,6 +1,9 @@
 import pandas as pd
 
 def preprocess_nyc_gov_hoo(df):
+    # Create a new column to store the original 'Agency Name' before modifications
+    df['Name - NYC.gov Redesign - Original Value'] = df['Agency Name']
+
     # Define the mapping directly within the script
     hoo_title_mapping = {
         "First Deputy Mayor": "Mayor's Office First Deputy Mayor",

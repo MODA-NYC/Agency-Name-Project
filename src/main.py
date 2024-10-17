@@ -9,6 +9,8 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src.data_loading import get_file_path, load_csv_data
 from src.data_normalization import standardize_name
 from src.data_merging import merge_dataframes, clean_merged_data, track_data_provenance
+from src.preprocess_nyc_gov_hoo import preprocess_nyc_gov_hoo
+from src.data_preprocessing import preprocess_agency_data, differentiate_mayors_office
 
 def setup_logging(log_level):
     logging.basicConfig(level=log_level, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -39,12 +41,27 @@ def main(data_dir, log_level, display, save):
     ops_data_path = get_file_path(data_dir, 'raw', 'ops_data.csv')
     ops_data = load_csv_data(ops_data_path)
 
+    # Preprocess nyc_gov_hoo
+    nyc_gov_hoo = preprocess_nyc_gov_hoo(nyc_gov_hoo)
+
+    # Preprocess ops_data
+    ops_data = preprocess_agency_data(ops_data)
+
     # Check if all datasets are loaded
     if nyc_agencies_export is not None and nyc_gov_hoo is not None and ops_data is not None:
-        # Normalize the Name fields
+        # Normalize the Name fields after preprocessing
         nyc_agencies_export['NameNormalized'] = nyc_agencies_export['Name'].apply(standardize_name)
         nyc_gov_hoo['NameNormalized'] = nyc_gov_hoo['Agency Name'].apply(standardize_name)
         ops_data['NameNormalized'] = ops_data['Agency Name'].apply(standardize_name)
+        
+        # Ensure 'Name' column exists
+        nyc_gov_hoo['Name'] = nyc_gov_hoo['Agency Name']
+        ops_data['Name'] = ops_data['Agency Name']
+
+        # Differentiate Mayor's Office entries
+        nyc_agencies_export = differentiate_mayors_office(nyc_agencies_export)
+        nyc_gov_hoo = differentiate_mayors_office(nyc_gov_hoo)
+        ops_data = differentiate_mayors_office(ops_data)
         
         logging.info("All datasets loaded and normalized successfully.")
         

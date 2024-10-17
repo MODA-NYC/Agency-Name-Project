@@ -1,4 +1,3 @@
-
 import re
 
 def standardize_name(name):
@@ -39,9 +38,7 @@ def standardize_name(name):
     expanded_words = [abbreviations.get(word, word) for word in words]
     name = ' '.join(expanded_words)
     # Remove common stopwords
-    stopwords = {'the', 'of', 'for', 'and', 'to', 'a', 'in', 'on'}
+    stopwords = {'the', 'of', 'for', 'and', 'to', 'a', 'in', 'on', 'office'}
     words = [word for word in name.split() if word not in stopwords]
     name = ' '.join(words)
-    return name
-
-
+    return name.strip()

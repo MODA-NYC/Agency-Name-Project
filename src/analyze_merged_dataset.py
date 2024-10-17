@@ -95,3 +95,46 @@ if 'OperationalStatus' in df.columns:
         print(unexpected_statuses[['Name', 'OperationalStatus']].head())
 else:
     print("\nColumn 'OperationalStatus' not found in the dataset.")
+
+# Load the ops_data.csv and nyc_gov_hoo.csv datasets
+ops_data_path = os.path.join(base_path, 'data', 'raw', 'ops_data.csv')
+nyc_gov_hoo_path = os.path.join(base_path, 'data', 'raw', 'nyc_gov_hoo.csv')
+
+ops_data_df = pd.read_csv(ops_data_path)
+nyc_gov_hoo_df = pd.read_csv(nyc_gov_hoo_path)
+
+# Standardize the agency names for comparison
+def standardize_name(name):
+    if pd.isna(name):
+        return name
+    return ' '.join(name.strip().lower().split())
+
+df['Name - Ops'] = df['Name - Ops'].apply(standardize_name)
+ops_data_df['Agency Name'] = ops_data_df['Agency Name'].apply(standardize_name)
+
+df['Name - NYC.gov Redesign'] = df['Name - NYC.gov Redesign'].apply(standardize_name)
+nyc_gov_hoo_df['Agency Name'] = nyc_gov_hoo_df['Agency Name'].apply(standardize_name)
+
+# Find mismatches between merged_dataset.csv and ops_data.csv
+ops_mismatches = df[~df['Name - Ops'].isin(ops_data_df['Agency Name']) & df['Name - Ops'].notna()]
+print(f"\nRecords in merged_dataset.csv with 'Name - Ops' not matching 'Agency Name' in ops_data.csv: {len(ops_mismatches)}")
+if not ops_mismatches.empty:
+    print(ops_mismatches[['Name', 'Name - Ops']].head())
+
+# Find mismatches between ops_data.csv and merged_dataset.csv
+ops_data_mismatches = ops_data_df[~ops_data_df['Agency Name'].isin(df['Name - Ops']) & ops_data_df['Agency Name'].notna()]
+print(f"\nRecords in ops_data.csv with 'Agency Name' not matching 'Name - Ops' in merged_dataset.csv: {len(ops_data_mismatches)}")
+if not ops_data_mismatches.empty:
+    print(ops_data_mismatches[['Agency Name']].head())
+
+# Find mismatches between merged_dataset.csv and nyc_gov_hoo.csv
+nyc_gov_mismatches = df[~df['Name - NYC.gov Redesign'].isin(nyc_gov_hoo_df['Agency Name']) & df['Name - NYC.gov Redesign'].notna()]
+print(f"\nRecords in merged_dataset.csv with 'Name - NYC.gov Redesign' not matching 'Agency Name' in nyc_gov_hoo.csv: {len(nyc_gov_mismatches)}")
+if not nyc_gov_mismatches.empty:
+    print(nyc_gov_mismatches[['Name', 'Name - NYC.gov Redesign']])
+
+# Find mismatches between nyc_gov_hoo.csv and merged_dataset.csv
+nyc_gov_hoo_mismatches = nyc_gov_hoo_df[~nyc_gov_hoo_df['Agency Name'].isin(df['Name - NYC.gov Redesign']) & nyc_gov_hoo_df['Agency Name'].notna()]
+print(f"\nRecords in nyc_gov_hoo.csv with 'Agency Name' not matching 'Name - NYC.gov Redesign' in merged_dataset.csv: {len(nyc_gov_hoo_mismatches)}")
+if not nyc_gov_hoo_mismatches.empty:
+    print(nyc_gov_hoo_mismatches[['Agency Name']].head())

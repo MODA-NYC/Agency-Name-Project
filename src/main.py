@@ -11,6 +11,7 @@ from src.data_normalization import standardize_name
 from src.data_merging import merge_dataframes, clean_merged_data, track_data_provenance
 from src.preprocess_nyc_gov_hoo import preprocess_nyc_gov_hoo
 from src.data_preprocessing import preprocess_agency_data, differentiate_mayors_office
+from src.match_generator import PotentialMatchGenerator
 
 def setup_logging(log_level):
     logging.basicConfig(level=log_level, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -117,6 +118,25 @@ def main(data_dir, log_level, display, save):
         if save:
             intermediate_dir = os.path.join(data_dir, 'intermediate')
             save_intermediate(merged_df, 'merged_dataset', intermediate_dir)
+        
+        # Initialize match generator
+        match_generator = PotentialMatchGenerator(
+            matches_file=os.path.join(data_dir, 'processed', 'consolidated_matches.csv')
+        )
+        
+        # Process new matches if merged dataset was created successfully
+        if merged_df is not None:
+            logging.info("Generating potential matches...")
+            try:
+                match_generator.process_new_matches(
+                    df=merged_df,
+                    name_column='NameNormalized',
+                    min_score=82.0,
+                    batch_size=1000
+                )
+                logging.info("Completed generating potential matches")
+            except Exception as e:
+                logging.error(f"Error generating matches: {e}")
     else:
         logging.error("One or more datasets failed to load.")
 

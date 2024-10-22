@@ -1,319 +1,237 @@
-Project Plan: Probabilistic Matching and Deduplication of Merged Dataset
-
-
-Objective
-
-
-Implement a probabilistic matching process to identify and consolidate duplicate records in merged_dataset.csv. The goal is to generate a list of potential matches for manual confirmation and then deduplicate the dataset based on these confirmations.
-
-
-Overview
-
-
-After merging nyc_agencies_export.csv, nyc_gov_hoo.csv, and ops_data.csv into merged_dataset.csv, we've identified duplicate entries with slight variations in their names and attributes. To address this, we'll implement a probabilistic matching algorithm to find probable duplicates, compile them for manual review in consolidated_matches.csv, and then deduplicate the merged dataset accordingly.
-
-
-Plan of Action
-
-
-1. Review the Merged Dataset
-
-
-Action: Examine merged_dataset.csv to understand the nature and extent of duplicates.
-
-
-Goal: Identify key fields that can be used for matching and understand the variations in duplicate entries.
-
-
-2. Identify Key Matching Fields
-
-
-Action: Determine which fields are most suitable for matching. Potential fields include:
-
-
-Name
-
-
-NameNormalized
-
-
-Acronym
-
-
-AlternateNames
-
-
-AlternateAcronyms
-
-
-Name - NYC.gov Redesign
-
-
-HeadOfOrganizationName
-
-
-Goal: Select fields that are most indicative of record identity to improve matching accuracy.
-
-
-3. Select a Probabilistic Matching Algorithm
-
-
-Action: Research and choose appropriate string similarity algorithms such as:
-
-
-Levenshtein Distance
-
-
-Jaro-Winkler Similarity
-
-
-FuzzyWuzzy (Token Sort Ratio, Token Set Ratio)
-
-
-RapidFuzz library for efficient computation
-
-
-Goal: Pick an algorithm that effectively handles slight variations and typos.
-
-
-4. Implement the Matching Script
-
-
-Action:
-
-
-Create a new script (e.g., probabilistic_matching.py).
-
-
-Read merged_dataset.csv into a DataFrame.
-
-
-Generate pairwise comparisons of records based on the selected fields.
-
-
-Compute similarity scores using the chosen algorithm.
-
-
-Goal: Calculate similarity scores for potential duplicate pairs.
-
-
-5. Set a Similarity Threshold
-
-
-Action:
-
-
-Analyze similarity scores to determine an appropriate threshold (e.g., 85%).
-
-
-Test different thresholds to balance between false positives and false negatives.
-
-
-Goal: Establish a threshold that identifies most true duplicates without overwhelming manual review.
-
-
-6. Generate Potential Matches
-
-
-Action:
-
-
-Filter pairs exceeding the similarity threshold.
-
-
-Create a DataFrame or CSV file (potential_matches.csv) with columns:
-
-
-RecordID_1
-
-
-RecordID_2
-
-
-Name_1
-
-
-Name_2
-
-
-Field_Compared
-
-
-Similarity_Score
-
-
-Goal: Compile a list of probable duplicates for manual confirmation.
-
-
-7. Prepare consolidated_matches.csv for Manual Review
-
-
-Action:
-
-
-Ensure consolidated_matches.csv exists with columns:
-
-
-RecordID_1
-
-
-RecordID_2
-
-
-Confirmed_Match (Yes/No)
-
-
-Comments (optional)
-
-
-Initially populate it with pairs from potential_matches.csv.
-
-
-Goal: Set up a file to document manual confirmations.
-
-
-8. Conduct Manual Confirmation
-
-
-Action:
-
-
-Review each pair in potential_matches.csv.
-
-
-For each pair, determine if they are duplicates.
-
-
-Update consolidated_matches.csv with confirmations.
-
-
-Goal: Create an authoritative list of confirmed duplicates.
-
-
-9. Update the Deduplication Script
-
-
-Action:
-
-
-Modify main.py or create a new script (e.g., deduplicate_dataset.py).
-
-
-Read merged_dataset.csv and consolidated_matches.csv.
-
-
-For confirmed matches:
-
-
-Merge records according to predefined rules.
-
-
-Remove duplicate entries.
-
-
-Goal: Produce a clean, deduplicated dataset.
-
-
-10. Define Merging Rules
-
-
-Action:
-
-
-Establish rules for merging fields, such as:
-
-
-Prefer non-null over null values.
-
-
-Use the most recently updated record.
-
-
-Combine lists of alternate names or acronyms.
-
-
-Goal: Ensure consistent and accurate data consolidation.
-
-
-11. Validate the Deduplicated Dataset
-
-
-Action:
-
-
-Perform quality checks on the deduplicated dataset.
-
-
-Spot-check records to ensure correct merging.
-
-
-Verify that no unique records were erroneously removed.
-
-
-Goal: Confirm the integrity and accuracy of the deduplicated data.
-
-
-12. Document the Process and Findings
-
-
-Action:
-
-
-Update ProjectPlan.md with:
-
-
-Details of the algorithms used.
-
-
-Thresholds selected and rationale.
-
-
-Any challenges and solutions encountered.
-
-
-Note any insights or patterns observed during manual review.
-
-
-Goal: Maintain comprehensive documentation for transparency and future reference.
-
-
-Additional Considerations
-
-
-Performance Optimization:
-
-
-Pairwise comparisons can be computationally intensive.
-
-
-Implement blocking techniques to reduce comparisons (e.g., only compare records with the same first letter).
-
-
-Data Storage:
-
-
-Ensure that all intermediate files are saved appropriately.
-
-
-Use version control (e.g., Git) to track changes to scripts.
-
-
-Future Updates:
-
-
-Consider automating the matching process for new data additions.
-
-
-Explore machine learning approaches for improved matching accuracy over time.
-
-
-Next Steps
-
-
-Begin implementing the matching script as outlined.
-
-
-Schedule time for manual review and confirmation.
-
-
-Plan for potential updates or iterations based on initial outcomes.
+# Project Plan: Probabilistic Matching and Deduplication of Merged Dataset
+
+## Objective
+Implement a probabilistic matching process to identify and consolidate duplicate records in `merged_dataset.csv` by utilizing the NameNormalized field. The goal is to generate a list of potential matches for manual confirmation and then deduplicate the dataset based on these confirmations.
+
+## Overview
+This project aims to create a standardized list of Agency Names for the NYC Open Data portal. The primary goal is to enhance data legibility and interoperability by providing official, consistently formatted agency names, which will serve as a canonical source for agency name formatting and improve data quality when joining datasets.
+
+After merging `nyc_agencies_export.csv`, `nyc_gov_hoo.csv`, and `ops_data.csv` into `merged_dataset.csv`, we've identified duplicate entries with slight variations in their names and attributes. To address this, we'll implement a probabilistic matching algorithm focusing on the NameNormalized field to find probable duplicates, compile them for manual review in `consolidated_matches.csv`, and then deduplicate the merged dataset accordingly.
+
+Note: The word "Agency" is colloquially used to mean a government organization that includes a New York City Agency, a Mayoral Office, or a Commission.
+
+## Plan of Action
+
+### 1. Implement Probabilistic Matching Based on NameNormalized
+
+**Action:**
+
+* 1.1. String Similarity Metrics Selection:
+  * Primary Metric: Jaro-Winkler Distance
+    - Optimal for short strings like organization names
+    - Weights matching characters at string start higher
+    - Effectively handles typos and minor variations
+  * Secondary Metric: Token Sort Ratio
+    - Handles word reordering in agency names
+    - Normalizes whitespace and case differences
+  * Implementation using RapidFuzz library for better performance
+    ```python
+    from rapidfuzz import fuzz
+    
+    def get_composite_score(str1, str2):
+        jw_score = fuzz.jaro_winkler(str1, str2, score_cutoff=0)
+        token_score = fuzz.token_sort_ratio(str1, str2, score_cutoff=0)
+        return (jw_score * 0.6) + (token_score * 0.4)
+    ```
+
+* 1.2. Matching Algorithm Development:
+  * Add specific NYC agency name patterns:
+    - Handle "NYC" prefix/suffix variations
+    - Account for "Mayor's Office of" vs "Office of" patterns
+    - Special handling for borough-specific variations
+    - Handle parenthetical acronyms
+  * Create composite scoring function combining both metrics:
+    - 60% weight on Jaro-Winkler (better for agency names)
+    - 40% weight on Token Sort Ratio (handles word reordering)
+  * Set threshold scores:
+    - Jaro-Winkler: 85% minimum similarity
+    - Token Sort: 80% minimum similarity
+    - Composite: 82% minimum similarity
+  * Implement blocking by first letter to improve performance
+    ```python
+    # Example blocking implementation
+    merged_df['NameFirstLetter'] = merged_df['NameNormalized'].str[0]
+    for letter in merged_df['NameFirstLetter'].unique():
+        block = merged_df[merged_df['NameNormalized'].str[0] == letter]
+        # Compare records within block
+    ```
+
+* 1.3. Data Preparation for Matching:
+  * Clean NameNormalized field:
+    - Convert to lowercase
+    - Remove extra whitespace
+    - Standardize abbreviations (e.g., 'dept' to 'department')
+    - Remove special characters while preserving meaningful punctuation
+  * Filter dataset:
+    - Remove null or empty NameNormalized entries
+    - Ensure consistent character encoding (ASCII)
+  * NYC-specific standardization rules:
+    - Standardize "NYC" placement (always prefix)
+    - Normalize mayoral office naming conventions
+    - Standardize borough name formats
+    - Handle special characters in O'Neill, etc.
+  * Example preprocessing:
+    ```python
+    import unicodedata
+    import re
+    
+    def clean_name_for_matching(name):
+        if pd.isna(name): return None
+        # Normalize unicode characters
+        name = unicodedata.normalize('NFKD', name)
+        # Convert to ASCII
+        name = name.encode('ascii', 'ignore').decode('ascii')
+        # Standardize abbreviations
+        name = re.sub(r'\bdept\b', 'department', name, flags=re.IGNORECASE)
+        # Remove special characters
+        name = re.sub(r'[^\w\s]', '', name)
+        return name.lower().strip()
+    ```
+
+### 2. Generate Potential Matches for Manual Review
+
+**Action:**
+
+* 2.1. Append New Potential Matches to `consolidated_matches.csv`:
+   * Match existing format in consolidated_matches.csv:
+    - Source: Always in lowercase
+    - Target: Always in lowercase
+    - Score: Optional numeric score (0-100)
+    - Label: "Match" or "No Match" (case-insensitive)
+  * Format new potential matches to match existing structure:
+    - Source: Original normalized name
+    - Target: Potential match normalized name
+    - Score: Similarity score (0-100)
+    - Label: Empty field for manual review
+  * Example structure:
+    ```csv
+    Source,Target,Score,Label
+    department of education,education department,92.5,
+    office of the mayor,mayors office,88.3,
+    ```
+  * Implementation approach:
+    ```python
+    def generate_potential_matches(merged_df):
+        # Get existing matches to avoid duplicates
+        existing_matches = pd.read_csv('data/processed/consolidated_matches.csv')
+        existing_pairs = set(zip(existing_matches['Source'], existing_matches['Target']))
+        
+        # Generate new potential matches
+        new_matches = []
+        for idx1, row1 in merged_df.iterrows():
+            block = merged_df[merged_df['NameNormalized'].str[0] == row1['NameNormalized'][0]]
+            for idx2, row2 in block.iterrows():
+                if idx1 < idx2:  # Avoid self-matches and duplicates
+                    score = get_composite_score(row1['NameNormalized'], row2['NameNormalized'])
+                    if score >= 82:  # Using threshold from section 1.2
+                        pair = (row1['NameNormalized'], row2['NameNormalized'])
+                        if pair not in existing_pairs:
+                            new_matches.append({
+                                'Source': pair[0],
+                                'Target': pair[1],
+                                'Score': score,
+                                'Label': ''
+                            })
+        
+        # Append new matches to existing file
+        new_matches_df = pd.DataFrame(new_matches)
+        new_matches_df.to_csv('data/processed/consolidated_matches.csv', 
+                            mode='a', header=False, index=False)
+    ```
+  * Quality checks:
+    - Ensure no duplicate pairs are added
+    - Verify score calculations are consistent
+    - Maintain consistent string normalization
+
+### 3. Manually Review and Confirm Matches
+
+**Action:**
+* 3.1. Review Process:
+  * Manually examine each pair in `consolidated_matches.csv`
+  * Determine whether records are true duplicates based on domain knowledge and additional attributes
+* 3.2. Label Matches:
+  * Assign a label of "Match" or "No Match" to each pair
+  * Save the reviewed pairs and labels in `consolidated_matches.csv`
+
+### 4. Deduplicate the Merged Dataset
+
+**Action:**
+* 4.1. Map Confirmed Matches:
+  * Create a mapping of duplicate records based on `consolidated_matches.csv`
+* 4.2. Merge Duplicates:
+  * Develop a process to merge duplicate records, consolidating their information
+  * Determine rules for handling conflicting data within duplicates
+* 4.3. Remove Redundancies:
+  * Eliminate duplicate records from `merged_dataset.csv` after merging
+
+### 5. Validate and Document the Deduplication Process
+
+**Action:**
+* 5.1. Validation:
+  * Verify that all duplicates have been appropriately merged and removed
+  * Check for any remaining inconsistencies or errors in the dataset
+  * NYC-specific validation:
+    - Verify borough consistency
+    - Check mayoral office naming standards
+    - Validate acronym usage
+    - Cross-reference against official NYC.gov listings
+  * Schema validation:
+    - Verify data types for all fields
+    - Ensure Budget Code preserves leading zeros
+    - Validate date fields (FoundingYear, SunsetYear)
+    - Check for obsolete or redundant fields
+* 5.2. Documentation:
+  * Record the methodologies used for probabilistic matching and deduplication
+  * Note any challenges faced and how they were resolved
+  * Include code snippets and explanations as reference for future maintenance
+
+## Deliverables
+* `consolidated_matches.csv`: List of potential duplicate pairs with similarity scores and manual review labels
+* `deduplicated_dataset.csv`: The final dataset with duplicates merged and removed
+* Documentation: Detailed report explaining the matching algorithm, deduplication steps, and decision-making processes
+
+**Dependencies:**
+- Add to requirements.txt:
+  ```
+  rapidfuzz>=3.0.0
+  ```
+
+**File Structure:**
+
+The project has the following file structure:
+
+```
+agency-name-project-main/
+├── data/
+│   ├── exports/
+│   ├── intermediate/
+│   │   └── merged_dataset.csv
+│   ├── processed/
+│   │   ├── .gitkeep
+│   │   ├── consolidated_matches.csv
+│   │   └── nyc_agencies_export.csv
+│   └── raw/
+│       ├── .gitkeep
+│       ├── CPO Data.csv
+│       ├── nyc_gov_hoo.csv
+│       ├── ODA Data.csv
+│       ├── ops_data.csv
+│       └── WeGov Data.csv
+├── docs/
+│   └── data_dictionary.csv
+├── src/
+│   ├── __init__.py
+│   ├── analyze_merged_dataset.py
+│   ├── data_loading.py
+│   ├── data_merging.py
+│   ├── data_normalization.py
+│   ├── data_preprocessing.py
+│   ├── main.py
+│   ├── preprocess_nyc_gov_hoo.py
+│   └── schema.py
+├── .gitignore
+├── FileStructure.md
+├── ProjectPlan.md
+├── README.md
+├── requirements.txt
+└── .cursorrules

@@ -1,161 +1,319 @@
-# Project Plan: Addressing Discrepancies in Merged Dataset
+Project Plan: Probabilistic Matching and Deduplication of Merged Dataset
 
-## Summary of the Issue
 
-1. **`nyc_gov_hoo.csv`** contains **177 records**, but only **62 records** have non-null values in the `"Name - NYC.gov Redesign"` field in `merged_dataset.csv`.
+Objective
 
-2. **`ops_data.csv`** contains **418 records**, but only **154 records** have non-null values in the `"Name - Ops"` field in `merged_dataset.csv`.
 
-## Objective
+Implement a probabilistic matching process to identify and consolidate duplicate records in merged_dataset.csv. The goal is to generate a list of potential matches for manual confirmation and then deduplicate the dataset based on these confirmations.
 
-Modify the data merging process to ensure that all records from `nyc_gov_hoo.csv` and `ops_data.csv` are properly included in `merged_dataset.csv`, without breaking existing functionality. Additionally, include rows in the merged_dataset file based on NameNormalized values from the merge sources that don't exist in the nyc_agencies_export.csv base file.
 
-## Plan of Action
+Overview
 
-1. **Review the Current Merging Process**
-2. **Identify Potential Causes for the Discrepancies**
-3. **Adjust the Merging Strategy**
-4. **Implement NameNormalized Creation**
-5. **Ensure Inclusion of New NameNormalized Entries**
-6. **Implement and Test Changes**
 
-## Detailed Steps
+After merging nyc_agencies_export.csv, nyc_gov_hoo.csv, and ops_data.csv into merged_dataset.csv, we've identified duplicate entries with slight variations in their names and attributes. To address this, we'll implement a probabilistic matching algorithm to find probable duplicates, compile them for manual review in consolidated_matches.csv, and then deduplicate the merged dataset accordingly.
 
-### 1. Review the Current Merging Process
-- Locate the `merge_dataframes` function in the codebase.
 
-### 2. Examine Merge Keys and Methods
-- Check which columns are being used to merge the datasets.
-- Determine the current merge method (inner, left, right, or outer join).
+Plan of Action
 
-### 3. Standardize Merge Keys
-- Implement a function to standardize agency names across datasets.
 
-### 4. Implement NameNormalized Creation
-- Create a function to generate NameNormalized values for each dataset.
-- Apply this function to nyc_gov_hoo.csv, ops_data.csv, and nyc_agencies_export.csv.
+1. Review the Merged Dataset
 
-### 5. Ensure Inclusion of New NameNormalized Entries
-- Modify the merge process to create new rows in the merged_dataset for NameNormalized values from nyc_gov_hoo.csv and ops_data.csv that don't exist in nyc_agencies_export.csv.
-- Implement a method to flag these new entries for review.
 
-### 6. Adjust the Merging Strategy
-- Modify the merge to use an outer join to include all records, including those with new NameNormalized values.
-- Ensure that the merge keys include the newly created NameNormalized field.
+Action: Examine merged_dataset.csv to understand the nature and extent of duplicates.
 
-### 7. Handle Missing and Duplicate Values
-- Decide on a strategy for handling NaN values and potential duplicates.
 
-### 8. Verify Data Types and Formats
-- Ensure consistency in data types for merge columns.
+Goal: Identify key fields that can be used for matching and understand the variations in duplicate entries.
 
-## Potential Issues and Resolutions
 
-### Issue 1: Inconsistent Agency Names
-- Create a mapping or crosswalk table for agency names.
-- Use data cleaning techniques to standardize names.
+2. Identify Key Matching Fields
 
-### Issue 2: Merge Method Excluding Records
-- Use outer joins to include all records from both datasets.
 
-### Issue 3: Data Cleaning Steps Removing Records
-- Review and adjust data cleaning steps to prevent unintended record removal.
+Action: Determine which fields are most suitable for matching. Potential fields include:
 
-## Example Code Updates
 
-### Standardizing Agency Names
+Name
 
-```python
-def standardize_agency_name(name):
-    if pd.isna(name):
-        return name
-    return ' '.join(name.strip().lower().split())
 
-# Apply to each dataframe
-nyc_gov_hoo_df['Agency Name'] = nyc_gov_hoo_df['Agency Name'].apply(standardize_agency_name)
-ops_data_df['Agency Name'] = ops_data_df['Agency Name'].apply(standardize_agency_name)
-main_df['Agency Name'] = main_df['Agency Name'].apply(standardize_agency_name)
-```
+NameNormalized
 
-### Creating and Including New NameNormalized Entries
 
-```python
-def create_name_normalized(name):
-    # Implementation of NameNormalized creation logic
-    pass
+Acronym
 
-# Apply to each dataframe
-for df in [nyc_gov_hoo_df, ops_data_df, main_df]:
-    df['NameNormalized'] = df['Agency Name'].apply(create_name_normalized)
 
-# Merge with inclusion of new NameNormalized entries
-merged_df = pd.merge(
-    left=main_df,
-    right=nyc_gov_hoo_df,
-    how='outer',
-    on='NameNormalized',
-    indicator=True
-)
+AlternateNames
 
-# Flag new entries
-merged_df['New_Entry'] = merged_df['_merge'] == 'right_only'
 
-# Repeat similar process for ops_data_df
-```
+AlternateAcronyms
 
-### Merging with Outer Joins
 
-```python
-# Merge nyc_gov_hoo_df into main_df
-merged_df = pd.merge(
-    left=main_df,
-    right=nyc_gov_hoo_df[['NameNormalized', 'Desired Columns...']],
-    how='outer',
-    on='NameNormalized'
-)
+Name - NYC.gov Redesign
 
-# Merge ops_data_df into merged_df
-merged_df = pd.merge(
-    left=merged_df,
-    right=ops_data_df[['NameNormalized', 'Desired Columns...']],
-    how='outer',
-    on='NameNormalized'
-)
-```
 
-## Validating the Results
+HeadOfOrganizationName
 
-1. **Check Record Counts**
-   - Verify that the number of records in merged_dataset.csv matches or exceeds the sum of unique records from all source files.
 
-2. **Spot-Check Data**
-   - Randomly select records from each source file and ensure they are correctly represented in merged_dataset.csv.
+Goal: Select fields that are most indicative of record identity to improve matching accuracy.
 
-3. **Handle Unmatched Records**
-   - Review any records that didn't match during the merge process and determine appropriate actions (e.g., manual review, additional data cleaning).
 
-4. **Review New Entries**
-   - Examine the rows flagged as new entries to ensure they are correctly identified and contain appropriate information.
+3. Select a Probabilistic Matching Algorithm
 
-## Next Steps
 
-1. Implement the Code Changes
-   - Update the merging script with the new standardization and merging logic.
-   - Implement the NameNormalized creation function.
-   - Add logic to include and flag new entries based on NameNormalized values.
+Action: Research and choose appropriate string similarity algorithms such as:
 
-2. Run the Merging Process
-   - Execute the updated script on the source data files.
 
-3. Verify the Output
-   - Perform the validation steps outlined above.
-   - Check for any unexpected issues or anomalies in the merged dataset.
+Levenshtein Distance
 
-4. Review for Side Effects
-   - Ensure that the changes haven't negatively impacted any existing functionality or data integrity.
 
-5. Document Changes
-   - Update any relevant documentation to reflect the new merging process and the inclusion of new NameNormalized entries.
+Jaro-Winkler Similarity
 
-6. Consider Automation
-   - Evaluate the possibility of automating this process for future updates to the dataset.
+
+FuzzyWuzzy (Token Sort Ratio, Token Set Ratio)
+
+
+RapidFuzz library for efficient computation
+
+
+Goal: Pick an algorithm that effectively handles slight variations and typos.
+
+
+4. Implement the Matching Script
+
+
+Action:
+
+
+Create a new script (e.g., probabilistic_matching.py).
+
+
+Read merged_dataset.csv into a DataFrame.
+
+
+Generate pairwise comparisons of records based on the selected fields.
+
+
+Compute similarity scores using the chosen algorithm.
+
+
+Goal: Calculate similarity scores for potential duplicate pairs.
+
+
+5. Set a Similarity Threshold
+
+
+Action:
+
+
+Analyze similarity scores to determine an appropriate threshold (e.g., 85%).
+
+
+Test different thresholds to balance between false positives and false negatives.
+
+
+Goal: Establish a threshold that identifies most true duplicates without overwhelming manual review.
+
+
+6. Generate Potential Matches
+
+
+Action:
+
+
+Filter pairs exceeding the similarity threshold.
+
+
+Create a DataFrame or CSV file (potential_matches.csv) with columns:
+
+
+RecordID_1
+
+
+RecordID_2
+
+
+Name_1
+
+
+Name_2
+
+
+Field_Compared
+
+
+Similarity_Score
+
+
+Goal: Compile a list of probable duplicates for manual confirmation.
+
+
+7. Prepare consolidated_matches.csv for Manual Review
+
+
+Action:
+
+
+Ensure consolidated_matches.csv exists with columns:
+
+
+RecordID_1
+
+
+RecordID_2
+
+
+Confirmed_Match (Yes/No)
+
+
+Comments (optional)
+
+
+Initially populate it with pairs from potential_matches.csv.
+
+
+Goal: Set up a file to document manual confirmations.
+
+
+8. Conduct Manual Confirmation
+
+
+Action:
+
+
+Review each pair in potential_matches.csv.
+
+
+For each pair, determine if they are duplicates.
+
+
+Update consolidated_matches.csv with confirmations.
+
+
+Goal: Create an authoritative list of confirmed duplicates.
+
+
+9. Update the Deduplication Script
+
+
+Action:
+
+
+Modify main.py or create a new script (e.g., deduplicate_dataset.py).
+
+
+Read merged_dataset.csv and consolidated_matches.csv.
+
+
+For confirmed matches:
+
+
+Merge records according to predefined rules.
+
+
+Remove duplicate entries.
+
+
+Goal: Produce a clean, deduplicated dataset.
+
+
+10. Define Merging Rules
+
+
+Action:
+
+
+Establish rules for merging fields, such as:
+
+
+Prefer non-null over null values.
+
+
+Use the most recently updated record.
+
+
+Combine lists of alternate names or acronyms.
+
+
+Goal: Ensure consistent and accurate data consolidation.
+
+
+11. Validate the Deduplicated Dataset
+
+
+Action:
+
+
+Perform quality checks on the deduplicated dataset.
+
+
+Spot-check records to ensure correct merging.
+
+
+Verify that no unique records were erroneously removed.
+
+
+Goal: Confirm the integrity and accuracy of the deduplicated data.
+
+
+12. Document the Process and Findings
+
+
+Action:
+
+
+Update ProjectPlan.md with:
+
+
+Details of the algorithms used.
+
+
+Thresholds selected and rationale.
+
+
+Any challenges and solutions encountered.
+
+
+Note any insights or patterns observed during manual review.
+
+
+Goal: Maintain comprehensive documentation for transparency and future reference.
+
+
+Additional Considerations
+
+
+Performance Optimization:
+
+
+Pairwise comparisons can be computationally intensive.
+
+
+Implement blocking techniques to reduce comparisons (e.g., only compare records with the same first letter).
+
+
+Data Storage:
+
+
+Ensure that all intermediate files are saved appropriately.
+
+
+Use version control (e.g., Git) to track changes to scripts.
+
+
+Future Updates:
+
+
+Consider automating the matching process for new data additions.
+
+
+Explore machine learning approaches for improved matching accuracy over time.
+
+
+Next Steps
+
+
+Begin implementing the matching script as outlined.
+
+
+Schedule time for manual review and confirmation.
+
+
+Plan for potential updates or iterations based on initial outcomes.

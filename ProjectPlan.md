@@ -57,36 +57,48 @@ Note: The word "Agency" is colloquially used to mean a government organization t
     ```
 
 * 1.3. Data Preparation for Matching:
+  * Add unique identifier:
+    - Generate RecordID for each entry in merged_dataset.csv
+    - Format: 'REC_XXXXXX' (where X is a zero-padded number)
   * Clean NameNormalized field:
     - Convert to lowercase
     - Remove extra whitespace
-    - Standardize abbreviations (e.g., 'dept' to 'department')
-    - Remove special characters while preserving meaningful punctuation
+    - Handle NYC-specific patterns
+    - Standardize abbreviations
+    - Remove special characters
   * Filter dataset:
     - Remove null or empty NameNormalized entries
     - Ensure consistent character encoding (ASCII)
   * NYC-specific standardization rules:
-    - Standardize "NYC" placement (always prefix)
-    - Normalize mayoral office naming conventions
-    - Standardize borough name formats
+    - Remove "NYC" prefix/suffix variations
+    - Standardize mayor's office naming patterns
+    - Remove borough names
     - Handle special characters in O'Neill, etc.
   * Example preprocessing:
     ```python
-    import unicodedata
-    import re
-    
-    def clean_name_for_matching(name):
-        if pd.isna(name): return None
-        # Normalize unicode characters
-        name = unicodedata.normalize('NFKD', name)
-        # Convert to ASCII
-        name = name.encode('ascii', 'ignore').decode('ascii')
-        # Standardize abbreviations
-        name = re.sub(r'\bdept\b', 'department', name, flags=re.IGNORECASE)
-        # Remove special characters
-        name = re.sub(r'[^\w\s]', '', name)
-        return name.lower().strip()
+    def prepare_merged_dataset(df):
+        # Add unique identifier
+        df['RecordID'] = [f'REC_{i:06d}' for i in range(len(df))]
+        
+        def clean_name_for_matching(name):
+            if pd.isna(name): return None
+            
+            # NYC-specific preprocessing
+            name = re.sub(r'\bnyc\s+|,?\s+nyc\b', '', name.lower())  # Handle NYC variations
+            name = re.sub(r"mayor'?s?\s+office\s+of\b", 'office of', name)  # Standardize mayor's office
+            name = re.sub(r'\b(brooklyn|queens|staten island|manhattan|bronx)\b', '', name)  # Remove borough names
+            
+            # Then proceed with general cleaning
+            name = unicodedata.normalize('NFKD', name)
+            name = name.encode('ascii', 'ignore').decode('ascii')
+            name = re.sub(r'\bdept\b', 'department', name, flags=re.IGNORECASE)
+            name = re.sub(r'[^\w\s]', '', name)
+            return name.strip()
+        
+        df['NameNormalized'] = df['Name'].apply(clean_name_for_matching)
+        return df
     ```
+
 
 ### 2. Generate Potential Matches for Manual Review
 
@@ -98,16 +110,20 @@ Note: The word "Agency" is colloquially used to mean a government organization t
     - Target: Always in lowercase
     - Score: Optional numeric score (0-100)
     - Label: "Match" or "No Match" (case-insensitive)
+    - SourceID: RecordID from merged_dataset.csv
+    - TargetID: RecordID from merged_dataset.csv
   * Format new potential matches to match existing structure:
     - Source: Original normalized name
     - Target: Potential match normalized name
     - Score: Similarity score (0-100)
-    - Label: Empty field for manual review
+    - Label: Auto-labeled "Match" for 100% scores, empty for others
+    - SourceID: Source record's RecordID
+    - TargetID: Target record's RecordID
   * Example structure:
     ```csv
-    Source,Target,Score,Label
-    department of education,education department,92.5,
-    office of the mayor,mayors office,88.3,
+    Source,Target,Score,Label,SourceID,TargetID
+    department of education,education department,92.5,,REC_000123,REC_000456
+    office of the mayor,mayors office,100,Match,REC_000789,REC_000012
     ```
   * Implementation approach:
     ```python
@@ -130,18 +146,28 @@ Note: The word "Agency" is colloquially used to mean a government organization t
                                 'Source': pair[0],
                                 'Target': pair[1],
                                 'Score': score,
-                                'Label': ''
+                                'Label': 'Match' if score == 100 else '',
+                                'SourceID': row1['RecordID'],
+                                'TargetID': row2['RecordID']
                             })
         
-        # Append new matches to existing file
-        new_matches_df = pd.DataFrame(new_matches)
-        new_matches_df.to_csv('data/processed/consolidated_matches.csv', 
-                            mode='a', header=False, index=False)
+        if new_matches:
+            # Convert to DataFrame and sort by score descending
+            new_matches_df = pd.DataFrame(new_matches)
+            new_matches_df = new_matches_df.sort_values('Score', ascending=False)
+            
+            # Append new matches to existing file
+            new_matches_df.to_csv('data/processed/consolidated_matches.csv', 
+                                mode='a', header=False, index=False)
     ```
   * Quality checks:
     - Ensure no duplicate pairs are added
     - Verify score calculations are consistent
     - Maintain consistent string normalization
+    - Validate RecordID references exist in merged_dataset.csv
+    - Confirm automatic labeling of 100% matches
+    - Monitor distribution of similarity scores
+    - Track coverage of manual reviews
 
 ### 3. Manually Review and Confirm Matches
 
@@ -235,3 +261,33 @@ agency-name-project-main/
 ├── README.md
 ├── requirements.txt
 └── .cursorrules
+
+```
+
+```
+def cleanup_consolidated_matches():
+    """Clean up and deduplicate entries in consolidated_matches.csv"""
+    matches_df = pd.read_csv('data/processed/consolidated_matches.csv')
+    
+    # Sort by Score descending, then by Label
+    matches_df = matches_df.sort_values(['Score', 'Label'], ascending=[False, True])
+    
+    # Drop duplicates keeping highest score and labeled entries
+    matches_df = matches_df.drop_duplicates(
+        subset=['Source', 'Target'], 
+        keep='first'
+    )
+    
+    # Sort for final output
+    matches_df = matches_df.sort_values(['Label', 'Score'], ascending=[False, False])
+    matches_df.to_csv('data/processed/consolidated_matches.csv', index=False)
+
+def validate_record_ids(merged_df, matches_df):
+    """Validate all RecordIDs in matches exist in merged dataset"""
+    valid_ids = set(merged_df['RecordID'])
+    source_ids = set(matches_df['SourceID'])
+    target_ids = set(matches_df['TargetID'])
+    
+    invalid_ids = (source_ids | target_ids) - valid_ids
+    if invalid_ids:
+        raise ValueError(f"Invalid RecordIDs found: {invalid_ids}")

@@ -36,3 +36,38 @@ def differentiate_mayors_office(df):
     df.loc[mayors_office_mask, 'NameNormalized'] = df.loc[mayors_office_mask, 'Name'].apply(standardize_name)
 
     return df
+
+def cleanup_consolidated_matches():
+    """Clean up and deduplicate entries in consolidated_matches.csv"""
+    matches_df = pd.read_csv('data/processed/consolidated_matches.csv')
+    
+    # Sort by Score descending, then by Label (so 'Match' comes before empty labels)
+    matches_df = matches_df.sort_values(['Score', 'Label'], ascending=[False, True])
+    
+    # Drop duplicates keeping first occurrence (highest score and labeled entries)
+    matches_df = matches_df.drop_duplicates(subset=['Source', 'Target'], keep='first')
+    
+    # Sort again for final output
+    matches_df = matches_df.sort_values(['Label', 'Score'], ascending=[False, False])
+    
+    # Save back to file
+    matches_df.to_csv('data/processed/consolidated_matches.csv', index=False)
+
+def preprocess_matches(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Preprocess the matches dataframe by adding record IDs and normalizing strings.
+    
+    Args:
+        df: Input DataFrame with Source and Target columns
+        
+    Returns:
+        Preprocessed DataFrame with RecordID column added
+    """
+    # Add RecordID column
+    df['RecordID'] = df.apply(generate_record_id, axis=1)
+    
+    # Normalize string columns
+    df['Source'] = df['Source'].str.lower().str.strip()
+    df['Target'] = df['Target'].str.lower().str.strip()
+    
+    return df

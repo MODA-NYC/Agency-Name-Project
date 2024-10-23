@@ -54,16 +54,16 @@ class StringSimilarityScorer:
         str1 = utils.default_process(str1)
         str2 = utils.default_process(str2)
         
-        # Calculate individual scores with thresholds
-        jw_score = fuzz.ratio(str1, str2, score_cutoff=self.jw_threshold)
+        # Use ratio and token_sort_ratio from rapidfuzz
+        basic_score = fuzz.ratio(str1, str2, score_cutoff=self.jw_threshold)
         token_score = fuzz.token_sort_ratio(str1, str2, score_cutoff=self.token_threshold)
         
         # If either score is below threshold, return None
-        if jw_score < self.jw_threshold or token_score < self.token_threshold:
+        if basic_score < self.jw_threshold or token_score < self.token_threshold:
             return None
             
         # Calculate weighted composite score
-        composite_score = (jw_score * self.jw_weight) + (token_score * self.token_weight)
+        composite_score = (basic_score * self.jw_weight) + (token_score * self.token_weight)
         
         # Return None if below composite threshold
         return composite_score if composite_score >= self.composite_threshold else None
@@ -91,8 +91,8 @@ class StringSimilarityScorer:
         str1 = utils.default_process(str1)
         str2 = utils.default_process(str2)
         
-        # Use ratio instead of jaro_winkler
-        jw_score = fuzz.ratio(str1, str2)
+        # Use ratio_normalized instead of jaro_winkler
+        jw_score = fuzz.ratio_normalized(str1, str2)
         token_score = fuzz.token_sort_ratio(str1, str2)
         
         if (jw_score < self.jw_threshold or 

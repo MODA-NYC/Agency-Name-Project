@@ -8,36 +8,69 @@ class AgencyMatcher:
     for NYC agency naming patterns and optimizations for performance.
     """
     
-    def __init__(self):
-        """Initialize the matcher with default settings and similarity scorer."""
-        self.scorer = StringSimilarityScorer()
+    def __init__(self, scorer: Optional[StringSimilarityScorer] = None):
+        """
+        Initialize matcher with similarity scorer.
+        
+        Args:
+            scorer: StringSimilarityScorer instance (creates new one if None)
+        """
+        self.scorer = scorer or StringSimilarityScorer()
         self.nyc_patterns = {
             'prefixes': ['nyc', 'new york city'],
             'office_patterns': ["mayor's office of", "office of"],
-            'boroughs': ['manhattan', 'brooklyn', 'queens', 'bronx', 'staten island'],
-            'common_abbrev': {
-                'dept': 'department',
-                'comm': 'commission',
-                'admin': 'administration',
-                'dev': 'development',
-                'svcs': 'services',
-                'mgmt': 'management'
-            }
+            'boroughs': ['manhattan', 'brooklyn', 'queens', 'bronx', 'staten island']
         }
 
-    def _standardize_nyc_patterns(self, name: str) -> str:
+    def _create_blocks(self, df: pd.DataFrame, name_column: str) -> Dict[str, pd.DataFrame]:
         """
-        Standardize NYC-specific naming patterns.
+        Create blocks of records for comparison based on first letter.
+        
+        Args:
+            df: DataFrame containing agency names
+            name_column: Name of column containing normalized agency names
+            
+        Returns:
+            Dictionary mapping first letters to DataFrames
+        """
+        blocks = {}
+        
+        # Add first letter column for blocking
+        df['first_letter'] = df[name_column].str[0]
+        
+        # Create main blocks by first letter
+        for letter in df['first_letter'].unique():
+            if pd.notna(letter):
+                blocks[letter] = df[df['first_letter'] == letter]
+        
+        # Create special NYC block
+        nyc_mask = df[name_column].str.startswith('nyc', na=False)
+        if nyc_mask.any():
+            blocks['nyc'] = df[nyc_mask]
+            
+        # Create special Mayor's Office block
+        mayors_mask = df[name_column].str.contains("mayor's office", na=False, case=False)
+        if mayors_mask.any():
+            blocks['mayors'] = df[mayors_mask]
+            
+        return blocks
+
+    def _standardize_name_for_comparison(self, name: str) -> str:
+        """
+        Apply NYC-specific standardization for comparison.
         
         Args:
             name: Agency name to standardize
             
         Returns:
-            Standardized agency name
+            Standardized name
         """
-        name = name.lower().strip()
+        if pd.isna(name):
+            return name
+            
+        name = name.lower()
         
-        # Standardize NYC prefix
+        # Handle NYC prefix/suffix
         for prefix in self.nyc_patterns['prefixes']:
             if name.startswith(prefix):
                 name = name.replace(prefix, 'nyc')
@@ -46,14 +79,14 @@ class AgencyMatcher:
                 name = name.replace(prefix, '')
                 name = f"nyc {name}"
                 break
-                
-        # Standardize office patterns
+        
+        # Handle office patterns
         for pattern in self.nyc_patterns['office_patterns']:
             if pattern in name:
-                name = name.replace(pattern, "mayors office of")
+                name = name.replace(pattern, "mayor's office of")
                 break
-                
-        # Standardize borough names
+        
+        # Handle borough variations
         for borough in self.nyc_patterns['boroughs']:
             if borough in name:
                 name = name.replace(f"borough of {borough}", borough)
@@ -61,7 +94,7 @@ class AgencyMatcher:
         
         return name.strip()
 
-    def _extract_acronym(self, name: str) -> Tuple[str, Optional[str]]:
+    def _extract_acronym(self, name: str) -> tuple[str, Optional[str]]:
         """
         Extract parenthetical acronyms from agency names.
         
@@ -83,32 +116,6 @@ class AgencyMatcher:
         
         return cleaned_name, acronym
 
-    def create_blocks(self, df: pd.DataFrame, column: str) -> Dict[str, pd.DataFrame]:
-        """
-        Create blocks of records for comparison based on first letter.
-        
-        Args:
-            df: DataFrame containing agency names
-            column: Name of column containing normalized agency names
-            
-        Returns:
-            Dictionary mapping first letters to DataFrames
-        """
-        blocks = {}
-        df['first_letter'] = df[column].str[0]
-        
-        # Create main blocks
-        for letter in df['first_letter'].unique():
-            if pd.notna(letter):
-                blocks[letter] = df[df['first_letter'] == letter]
-        
-        # Create NYC block separately (common prefix)
-        nyc_mask = df[column].str.startswith('nyc', na=False)
-        if nyc_mask.any():
-            blocks['nyc'] = df[nyc_mask]
-        
-        return blocks
-
     def find_potential_matches(
         self,
         df: pd.DataFrame,
@@ -127,7 +134,9 @@ class AgencyMatcher:
             List of dictionaries containing match information
         """
         potential_matches = []
-        blocks = self.create_blocks(df, name_column)
+        
+        # Create blocks for efficient comparison
+        blocks = self._create_blocks(df, name_column)
         
         # Process each block
         for block_key, block_df in blocks.items():
@@ -140,7 +149,7 @@ class AgencyMatcher:
                     continue
                     
                 # Standardize first name
-                std_name1 = self._standardize_nyc_patterns(name1)
+                std_name1 = self._standardize_name_for_comparison(name1)
                 name1_clean, acronym1 = self._extract_acronym(std_name1)
                 
                 # Compare with other records in block
@@ -154,7 +163,7 @@ class AgencyMatcher:
                         continue
                         
                     # Standardize second name
-                    std_name2 = self._standardize_nyc_patterns(name2)
+                    std_name2 = self._standardize_name_for_comparison(name2)
                     name2_clean, acronym2 = self._extract_acronym(std_name2)
                     
                     # Get similarity score
@@ -164,6 +173,10 @@ class AgencyMatcher:
                     acronym_match = False
                     if acronym1 and acronym2:
                         acronym_match = acronym1.lower() == acronym2.lower()
+                        
+                    # Boost score for acronym matches
+                    if acronym_match and score:
+                        score = min(100, score + 5)
                     
                     # Add to potential matches if score is high enough
                     if score and score >= min_score:

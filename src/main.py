@@ -2,6 +2,7 @@ import argparse
 import logging
 import os
 import sys
+import pandas as pd
 
 # Add the project root to the Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -12,6 +13,7 @@ from src.data_merging import merge_dataframes, clean_merged_data, track_data_pro
 from src.preprocess_nyc_gov_hoo import preprocess_nyc_gov_hoo
 from src.data_preprocessing import preprocess_agency_data, differentiate_mayors_office
 from src.match_generator import PotentialMatchGenerator
+from src.string_matching import generate_record_id
 
 def setup_logging(log_level):
     logging.basicConfig(level=log_level, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -108,7 +110,13 @@ def main(data_dir, log_level, display, save):
         # Track data provenance
         merged_df = track_data_provenance(merged_df)
         
-        logging.info("Datasets merged and cleaned successfully.")
+        # Add RecordID to merged dataset
+        merged_df['RecordID'] = merged_df.apply(lambda row: generate_record_id({
+            'Source': row['Name'],
+            'Target': row['NameNormalized']
+        }), axis=1)
+        
+        logging.info("Datasets merged, cleaned, and IDs generated successfully.")
         
         # Display the head of the merged DataFrame if requested
         if display:
@@ -131,7 +139,7 @@ def main(data_dir, log_level, display, save):
                 match_generator.process_new_matches(
                     df=merged_df,
                     name_column='NameNormalized',
-                    min_score=82.0,
+                    min_score=75.0,  # Lower threshold for normalized names
                     batch_size=1000
                 )
                 logging.info("Completed generating potential matches")
@@ -139,6 +147,23 @@ def main(data_dir, log_level, display, save):
                 logging.error(f"Error generating matches: {e}")
     else:
         logging.error("One or more datasets failed to load.")
+
+def process_matches(merged_df):
+    """Process matches and clean up the consolidated_matches.csv file"""
+    # Generate new potential matches
+    generate_potential_matches(merged_df)
+    
+    # Clean up any duplicates in consolidated_matches.csv
+    cleanup_consolidated_matches()
+    
+    # Log summary of matches
+    matches_df = pd.read_csv('data/processed/consolidated_matches.csv')
+    auto_matches = matches_df[matches_df['Score'] == 100].shape[0]
+    pending_review = matches_df[matches_df['Label'] == ''].shape[0]
+    
+    logging.info(f"Generated matches summary:")
+    logging.info(f"- Auto-labeled matches (100% score): {auto_matches}")
+    logging.info(f"- Pending manual review: {pending_review}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Process NYC organization data.")

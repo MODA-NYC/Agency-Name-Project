@@ -3,6 +3,7 @@ import logging
 import os
 import sys
 import pandas as pd
+import networkx as nx
 
 # Add the project root to the Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -27,6 +28,22 @@ def save_intermediate(df, name, output_dir):
     output_path = os.path.join(output_dir, f"{name}.csv")
     df.to_csv(output_path, index=False)
     logging.info(f"Saved {name} to {output_path}")
+
+def remove_redundancies(merged_df, deduplicated_df, match_groups):
+    if not match_groups:  # If no matches were found
+        logging.warning("No redundancies to remove. Returning original dataset.")
+        return merged_df
+        
+    # Create a set of all RecordIDs in match groups
+    matched_record_ids = set(record_id for group in match_groups for record_id in group)
+    
+    # Identify non-duplicate records
+    non_duplicate_records = merged_df[~merged_df['RecordID'].isin(matched_record_ids)]
+    
+    # Append non-duplicate records to the deduplicated DataFrame
+    final_df = pd.concat([deduplicated_df, non_duplicate_records], ignore_index=True)
+    
+    return final_df
 
 def main(data_dir, log_level, display, save):
     setup_logging(log_level)
@@ -145,6 +162,29 @@ def main(data_dir, log_level, display, save):
                 logging.info("Completed generating potential matches")
             except Exception as e:
                 logging.error(f"Error generating matches: {e}")
+        
+        # Load the confirmed matches
+        matches_path = os.path.join(data_dir, 'processed', 'consolidated_matches.csv')
+        if not os.path.exists(matches_path):
+            logging.warning(f"No matches file found at {matches_path}")
+            matches_df = pd.DataFrame(columns=['Source', 'Target', 'Score', 'Label', 'SourceID', 'TargetID'])
+        else:
+            matches_df = pd.read_csv(matches_path)
+        
+        # Build match groups
+        match_groups = build_match_groups(matches_df)
+        logging.info(f"Found {len(match_groups)} match groups")
+        
+        # Deduplicate the dataset
+        deduplicated_df = deduplicate_dataset(merged_df, match_groups)
+        
+        # Remove redundancies and finalize the dataset
+        final_df = remove_redundancies(merged_df, deduplicated_df, match_groups)
+        
+        # Save the final deduplicated dataset
+        final_deduplicated_path = os.path.join(data_dir, 'processed', 'final_deduplicated_dataset.csv')
+        final_df.to_csv(final_deduplicated_path, index=False)
+        logging.info(f"Final deduplicated dataset saved to {final_deduplicated_path}")
     else:
         logging.error("One or more datasets failed to load.")
 
@@ -164,6 +204,86 @@ def process_matches(merged_df):
     logging.info(f"Generated matches summary:")
     logging.info(f"- Auto-labeled matches (100% score): {auto_matches}")
     logging.info(f"- Pending manual review: {pending_review}")
+
+def build_match_groups(matches_df):
+    # Create graph from confirmed matches
+    G = nx.Graph()
+    
+    # Check if SourceID and TargetID columns exist
+    if 'SourceID' not in matches_df.columns or 'TargetID' not in matches_df.columns:
+        logging.warning("SourceID or TargetID columns missing from matches file")
+        # Add empty SourceID and TargetID columns if they don't exist
+        matches_df['SourceID'] = None
+        matches_df['TargetID'] = None
+    
+    # Add edges for matches with valid IDs
+    for _, row in matches_df[matches_df['Label'].str.lower() == 'match'].iterrows():
+        if pd.notna(row['SourceID']) and pd.notna(row['TargetID']):
+            G.add_edge(row['SourceID'], row['TargetID'])
+    
+    # Get connected components (groups of related matches)
+    components = list(nx.connected_components(G))
+    logging.info(f"Found {len(components)} match groups")
+    return components
+
+def merge_duplicate_records(group, merged_df):
+    records = merged_df[merged_df['RecordID'].isin(group)]
+    
+    # Check for edge cases
+    check_for_conflicts(records)
+    
+    # Get the actual column names from the DataFrame
+    nyc_gov_col = 'Name - NYC.gov Redesign'  # Note the capital R in Redesign
+    ops_col = 'Name - Ops'
+    
+    # Merge fields according to rules
+    merged = {
+        'NameNormalized': records['NameNormalized'].iloc[0],  # Arbitrary choice
+        'Name - Ops': ', '.join(records[ops_col].dropna().unique()) if ops_col in records.columns else '',
+        'Name - NYC.gov Redesign': ', '.join(records[nyc_gov_col].dropna().unique()) if nyc_gov_col in records.columns else '',
+        'PrincipalOfficerName': records['PrincipalOfficerName'].fillna(records['HeadOfOrganizationName']).iloc[0] if 'PrincipalOfficerName' in records.columns else None,
+        'PrincipalOfficerTitle': records['PrincipalOfficerTitle'].fillna(records['HeadOfOrganizationTitle']).iloc[0] if 'PrincipalOfficerTitle' in records.columns else None,
+        'PrincipalOfficerContactURL': records['HeadOfOrganizationURL'].iloc[0] if 'HeadOfOrganizationURL' in records.columns else None
+    }
+    
+    return merged
+
+def check_for_conflicts(records):
+    names = records['HeadOfOrganizationName'].dropna().unique()
+    if len(names) > 1:
+        logging.warning(f"Conflict detected in HeadOfOrganizationName: {names}")
+
+def deduplicate_dataset(merged_df, match_groups):
+    if not match_groups:  # If no matches were found
+        logging.warning("No match groups found. Returning original dataset with minimal processing.")
+        # Create a copy of merged_df with only the columns we need
+        result_df = merged_df.copy()
+        # Ensure all required columns exist
+        required_columns = [
+            'NameNormalized',
+            'Name - Ops',
+            'Name - NYC.gov Redesign',  # Updated column name
+            'PrincipalOfficerName',
+            'PrincipalOfficerTitle',
+            'HeadOfOrganizationName',
+            'HeadOfOrganizationTitle',
+            'HeadOfOrganizationURL'
+        ]
+        for col in required_columns:
+            if col not in result_df.columns:
+                result_df[col] = None
+        return result_df
+        
+    deduplicated_records = []
+    
+    for group in match_groups:
+        merged_record = merge_duplicate_records(group, merged_df)
+        deduplicated_records.append(merged_record)
+    
+    # Convert to DataFrame
+    deduplicated_df = pd.DataFrame(deduplicated_records)
+    
+    return deduplicated_df
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Process NYC organization data.")

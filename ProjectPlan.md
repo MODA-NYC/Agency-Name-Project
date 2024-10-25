@@ -182,13 +182,79 @@ Note: The word "Agency" is colloquially used to mean a government organization t
 ### 4. Deduplicate the Merged Dataset
 
 **Action:**
-* 4.1. Map Confirmed Matches:
-  * Create a mapping of duplicate records based on `consolidated_matches.csv`
-* 4.2. Merge Duplicates:
-  * Develop a process to merge duplicate records, consolidating their information
-  * Determine rules for handling conflicting data within duplicates
-* 4.3. Remove Redundancies:
-  * Eliminate duplicate records from `merged_dataset.csv` after merging
+
+#### 4.1. Map Confirmed Matches
+* Create Connected Components:
+  - Build graph from confirmed matches in `consolidated_matches.csv`
+  - Identify all connected components (groups of related matches)
+  - Handle transitive relationships
+  ```python
+  def build_match_groups(matches_df):
+      # Create graph from confirmed matches
+      G = nx.Graph()
+      
+      # Add edges for matches
+      for _, row in matches_df[matches_df['Label'] == 'Match'].iterrows():
+          G.add_edge(row['SourceID'], row['TargetID'])
+      
+      # Get connected components (groups of related matches)
+      return list(nx.connected_components(G))
+  ```
+
+#### 4.2. Merge Duplicates
+* Canonical Record Selection:
+  - Use any NameNormalized value as canonical (arbitrary choice)
+  - Merge all values from nyc_agencies_export, nyc_gov_hoo, and ops_data
+  - Store "Name - Ops" and "Name - NYC.gov redesign" in separate columns
+
+* Field Merging Rules:
+  1. Principal Officer Fields:
+     - Use `HeadOfOrganizationName` for `PrincipalOfficerName` if blank
+     - Use `HeadOfOrganizationTitle` for `PrincipalOfficerTitle` if blank
+     - Create `PrincipalOfficerContactURL` from `HeadOfOrganizationURL`
+  2. Alert for Edge Cases:
+     - Implement alert for multiple `HeadOfOrganizationName` values in a match group
+     ```python
+     def check_for_conflicts(records):
+         names = records['HeadOfOrganizationName'].dropna().unique()
+         if len(names) > 1:
+             print(f"Conflict detected: {names}")
+     ```
+
+* Implementation:
+  ```python
+  def merge_duplicate_records(group, merged_df):
+      records = merged_df[merged_df['RecordID'].isin(group)]
+      
+      # Check for edge cases
+      check_for_conflicts(records)
+      
+      # Merge fields according to rules
+      merged = {
+          'NameNormalized': records['NameNormalized'].iloc[0],  # Arbitrary choice
+          'Name - Ops': records['Name - Ops'].dropna().unique(),
+          'Name - NYC.gov redesign': records['Name - NYC.gov redesign'].dropna().unique(),
+          'PrincipalOfficerName': records['PrincipalOfficerName'].fillna(records['HeadOfOrganizationName']).iloc[0],
+          'PrincipalOfficerTitle': records['PrincipalOfficerTitle'].fillna(records['HeadOfOrganizationTitle']).iloc[0],
+          'PrincipalOfficerContactURL': records['HeadOfOrganizationURL'].iloc[0]
+      }
+      
+      return merged
+  ```
+
+#### 4.3. Remove Redundancies
+* Process:
+  1. Create new deduplicated dataset
+  2. Add merged records
+  3. Add non-duplicate records
+  4. Verify no information loss
+  5. Update all references to old RecordIDs
+
+* Quality Checks:
+  - Verify all required fields present
+  - Validate merged data consistency
+  - Check referential integrity
+  - Document merge decisions
 
 ### 5. Validate and Document the Deduplication Process
 
@@ -264,30 +330,3 @@ agency-name-project-main/
 
 ```
 
-```
-def cleanup_consolidated_matches():
-    """Clean up and deduplicate entries in consolidated_matches.csv"""
-    matches_df = pd.read_csv('data/processed/consolidated_matches.csv')
-    
-    # Sort by Score descending, then by Label
-    matches_df = matches_df.sort_values(['Score', 'Label'], ascending=[False, True])
-    
-    # Drop duplicates keeping highest score and labeled entries
-    matches_df = matches_df.drop_duplicates(
-        subset=['Source', 'Target'], 
-        keep='first'
-    )
-    
-    # Sort for final output
-    matches_df = matches_df.sort_values(['Label', 'Score'], ascending=[False, False])
-    matches_df.to_csv('data/processed/consolidated_matches.csv', index=False)
-
-def validate_record_ids(merged_df, matches_df):
-    """Validate all RecordIDs in matches exist in merged dataset"""
-    valid_ids = set(merged_df['RecordID'])
-    source_ids = set(matches_df['SourceID'])
-    target_ids = set(matches_df['TargetID'])
-    
-    invalid_ids = (source_ids | target_ids) - valid_ids
-    if invalid_ids:
-        raise ValueError(f"Invalid RecordIDs found: {invalid_ids}")

@@ -5,6 +5,7 @@ from pathlib import Path
 from .matching_algorithm import AgencyMatcher
 from .data_preparation import AgencyNamePreprocessor
 from .string_matching import get_composite_score  # Add this import
+from .enhanced_matching import EnhancedMatcher
 
 class PotentialMatchGenerator:
     """
@@ -26,7 +27,7 @@ class PotentialMatchGenerator:
             preprocessor: AgencyNamePreprocessor instance (creates new if None)
             matches_file: Path to consolidated_matches.csv
         """
-        self.matcher = matcher or AgencyMatcher()
+        self.matcher = matcher or EnhancedMatcher()
         self.preprocessor = preprocessor or AgencyNamePreprocessor()
         self.matches_file = Path(matches_file)
         self.existing_matches = self._load_existing_matches()  # Initialize existing_matches
@@ -187,22 +188,13 @@ class PotentialMatchGenerator:
                 if comparison_count % 1000 == 0:
                     self.logger.info(f"Processed {comparison_count} comparisons, found {match_count} matches")
                 
-                # Skip if this pair is already in existing matches
-                if (name1, name2) in self.existing_matches or \
-                   (name2, name1) in self.existing_matches:
-                    continue
-                    
-                score = get_composite_score(name1, name2)
-                
-                # Debug log for scores near threshold
-                if score > 70:  # Log scores that are close to matching
-                    self.logger.debug(f"Near match: '{name1}' - '{name2}' = {score}")
+                # Use enhanced matcher to find matches
+                score = self.matcher.find_matches(name1, name2)
                 
                 if score >= min_score:
                     match_count += 1
                     self.logger.info(f"Found match: '{name1}' - '{name2}' = {score}")
                     
-                    # Find the RecordIDs from merged_dataset for this pair
                     try:
                         record1 = df[df[name_column] == name1].iloc[0]
                         record2 = df[df[name_column] == name2].iloc[0]
@@ -211,23 +203,15 @@ class PotentialMatchGenerator:
                             'Source': name1,
                             'Target': name2,
                             'Score': round(float(score), 1),
-                            'Label': 'Match' if score >= 95 else '',  # Only auto-label very high confidence matches
+                            'Label': 'Match' if score >= 95 else '',
                             'SourceID': record1['RecordID'],
                             'TargetID': record2['RecordID']
                         })
                         
-                        if len(new_matches) >= batch_size:
-                            self.logger.info(f"Saving batch of {len(new_matches)} matches")
-                            self._save_matches(new_matches)
-                            new_matches = []
                     except Exception as e:
                         self.logger.error(f"Error processing match {name1} - {name2}: {e}")
         
-        # Save any remaining matches
-        if new_matches:
-            self.logger.info(f"Saving final batch of {len(new_matches)} matches")
-            self._save_matches(new_matches)
-            
+        self._save_matches(new_matches)
         self.logger.info(f"Completed match generation. Processed {comparison_count} comparisons, found {match_count} matches")
     
     def _save_matches(self, new_matches: List[Dict]):
@@ -314,3 +298,4 @@ class PotentialMatchGenerator:
             # Append new matches to existing file
             new_matches_df.to_csv('data/processed/consolidated_matches.csv', 
                                 mode='a', header=False, index=False)
+

@@ -34,27 +34,148 @@ Note: The word "Agency" is colloquially used to mean a government organization t
         return (jw_score * 0.6) + (token_score * 0.4)
     ```
 
-* 1.2. Matching Algorithm Development:
-  * Add specific NYC agency name patterns:
-    - Handle "NYC" prefix/suffix variations
-    - Account for "Mayor's Office of" vs "Office of" patterns
-    - Special handling for borough-specific variations
-    - Handle parenthetical acronyms
-  * Create composite scoring function combining both metrics:
-    - 60% weight on Jaro-Winkler (better for agency names)
-    - 40% weight on Token Sort Ratio (handles word reordering)
-  * Set threshold scores:
-    - Jaro-Winkler: 85% minimum similarity
-    - Token Sort: 80% minimum similarity
-    - Composite: 82% minimum similarity
-  * Implement blocking by first letter to improve performance
-    ```python
-    # Example blocking implementation
-    merged_df['NameFirstLetter'] = merged_df['NameNormalized'].str[0]
-    for letter in merged_df['NameFirstLetter'].unique():
-        block = merged_df[merged_df['NameNormalized'].str[0] == letter]
-        # Compare records within block
-    ```
+* 1.2. Matching Algorithm Enhancement
+
+Based on analysis of confirmed matches, implement the following improvements:
+
+#### A. NYC-Specific Name Patterns
+1. **NYC/New York City Variations**:
+   - Prefix variations: "nyc", "new york city"
+   - Suffix variations: ", nyc", ", new york city"
+   - Handle both presence and absence of these identifiers
+   ```python
+   def standardize_nyc_references(name):
+       # Remove NYC variations consistently
+       name = re.sub(r'\b(nyc|new york city)\s+|,?\s+(nyc|new york city)\b', '', name)
+       return name.strip()
+   ```
+
+2. **Department/Office Name Patterns**:
+   - Word order variations: "X Department" vs "Department of X"
+   - Handle "Department", "Office", "Commission" consistently
+   ```python
+   def standardize_org_type(name):
+       patterns = {
+           r'department\s+of\s+(\w+)': r'\1 department',
+           r'office\s+of\s+(\w+)': r'\1 office',
+           r'commission\s+on\s+(\w+)': r'\1 commission'
+       }
+       return apply_patterns(name, patterns)
+   ```
+
+3. **Mayor's Office Variations**:
+   - "Mayor's Office of X" vs "Office of X"
+   - "Mayor's X" vs "X"
+   - Handle apostrophe variations
+   ```python
+   def standardize_mayors_office(name):
+       patterns = {
+           r"mayor'?s?\s+office\s+of\s+(\w+)": r"office of \1",
+           r"mayor'?s?\s+(\w+)\s+office": r"\1 office"
+       }
+       return apply_patterns(name, patterns)
+   ```
+
+#### B. Hierarchical Organization Handling
+1. **Parent-Child Relationships**:
+   - Handle cases like "Department of Social Services / Human Resources Administration"
+   - Track relationships between parent and sub-agencies
+   ```python
+   def identify_parent_child(name):
+       # Map known parent-child relationships
+       parent_child_map = {
+           'department social services': [
+               'human resources administration',
+               'department homeless services'
+           ]
+       }
+   ```
+
+2. **Multi-Name Organizations**:
+   - Handle cases where one agency has multiple official names
+   - Create canonical name mappings
+   ```python
+   canonical_names = {
+       'education department': [
+           'department education',
+           'public schools new york city'
+       ]
+   }
+   ```
+
+#### C. Enhanced Scoring System
+1. **Composite Scoring**:
+   - Increase weight for organizational type matches
+   - Bonus points for matching acronyms
+   - Special handling for known variations
+   ```python
+   def get_enhanced_score(str1, str2):
+       base_score = get_composite_score(str1, str2)
+       org_type_bonus = check_org_type_match(str1, str2) * 5
+       acronym_bonus = check_acronym_match(str1, str2) * 10
+       return min(100, base_score + org_type_bonus + acronym_bonus)
+   ```
+
+2. **Pattern-Based Boosting**:
+   - Boost scores for known equivalent patterns
+   - Handle common abbreviations
+   ```python
+   abbreviation_map = {
+       'dept': 'department',
+       'comm': 'commission',
+       'svcs': 'services',
+       'admin': 'administration'
+   }
+   ```
+
+#### D. Implementation Strategy
+1. **Pre-processing Pipeline**:
+   ```python
+   def preprocess_agency_name(name):
+       name = standardize_nyc_references(name)
+       name = standardize_org_type(name)
+       name = standardize_mayors_office(name)
+       name = expand_abbreviations(name)
+       return name
+   ```
+
+2. **Matching Pipeline**:
+   ```python
+   def find_matches(name1, name2):
+       # Apply preprocessing
+       std1 = preprocess_agency_name(name1)
+       std2 = preprocess_agency_name(name2)
+       
+       # Check for exact matches after standardization
+       if std1 == std2:
+           return 100
+           
+       # Check canonical name mappings
+       if check_canonical_names(std1, std2):
+           return 100
+           
+       # Calculate enhanced similarity score
+       return get_enhanced_score(std1, std2)
+   ```
+
+3. **Quality Assurance**:
+   - Unit tests for each standardization function
+   - Validation against known matches
+   - Performance monitoring for large datasets
+   ```python
+   def validate_matching_rules():
+       test_cases = load_test_cases()
+       for case in test_cases:
+           assert find_matches(case.name1, case.name2) >= case.expected_score
+   ```
+
+This enhancement will be implemented incrementally:
+1. First implement NYC-specific patterns
+2. Add hierarchical organization handling
+3. Enhance scoring system
+4. Add comprehensive testing
+5. Validate against existing matches
+6. Fine-tune thresholds based on results
 
 * 1.3. Data Preparation for Matching:
   * Add unique identifier:
@@ -329,4 +450,5 @@ agency-name-project-main/
 └── .cursorrules
 
 ```
+
 

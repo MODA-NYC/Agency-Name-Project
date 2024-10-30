@@ -20,3 +20,12 @@ This project specifically works with:
 - String similarity algorithms (Levenshtein, Jaro-Winkler, FuzzyWuzzy)
 - Data normalization techniques
 - Government organizational hierarchies
+
+Additional Guidelines:
+- Each data source should have its own processor in src/preprocessing/
+- Common functionality should be in base classes
+- Analysis scripts should be in src/analysis/
+- Matching logic should be in src/matching/
+- Each module should have a clear single responsibility
+- Prefer inheritance over code duplication
+- Include logging and error handling in all processors

@@ -3,16 +3,17 @@
 ```
 agency-name-project/
 ├── data/
-│   ├── analysis/
+│   ├── analysis/                    # Analysis outputs
+│   │   ├── combined_records_analysis.csv
 │   │   ├── duplicates_hoo.csv
+│   │   ├── duplicates_merged_dataset.csv
+│   │   ├── match_issues_analysis.csv
+│   │   ├── missing_records_analysis.csv
 │   │   ├── raw_duplicates_hoo.csv
-│   │   ├── raw_duplicates_ops.csv
 │   │   └── raw_duplicates_ops.csv
-│   ├── exports/
+│   ├── intermediate/               # Intermediate processing results
 │   │   └── merged_dataset.csv
-│   ├── intermediate/
-│   │   └── merged_dataset.csv
-│   ├── processed/
+│   ├── processed/                  # Final and processed datasets
 │   │   ├── consolidated_matches.csv
 │   │   ├── dedup_data_with_normalized.csv
 │   │   ├── final_deduplicated_dataset.csv
@@ -20,83 +21,78 @@ agency-name-project/
 │   │   ├── nyc_agencies_export.csv
 │   │   ├── ops_data_with_normalized.csv
 │   │   └── potential_matches.csv
-│   └── raw/
+│   └── raw/                        # Original source data
 │       ├── CPO Data.csv
-│       ├── nyc_gov_hoo.csv
 │       ├── ODA Data.csv
-│       ├── ops_data.csv
-│       └── WeGov Data.csv
+│       ├── WeGov Data.csv
+│       ├── nyc_gov_hoo.csv
+│       └── ops_data.csv
 ├── docs/
 │   └── data_dictionary.csv
+├── project_plans/                  # Project documentation
+│   ├── EntityMatchingPlan.md       # Current focused plan
+│   └── OriginalPlan.md            # Original broader plan
 ├── src/
-│   ├── analysis/
-│   │   ├── __init__.py
+│   ├── analysis/                   # Analysis tools
+│   │   ├── dataset_validator.py
+│   │   ├── match_analyzer.py
+│   │   ├── match_quality_report.py
+│   │   ├── match_validator.py
+│   │   ├── name_transformation_analyzer.py
 │   │   └── quality_checker.py
-│   ├── matching/
+│   ├── matching/                   # Matching logic
 │   │   ├── __init__.py
-│   │   ├── matcher.py
-│   │   └── normalizer.py
-│   ├── preprocessing/
+│   │   ├── enhanced_matching.py
+│   │   ├── matcher.py             # Core matching algorithm
+│   │   ├── normalizer.py          # Name normalization
+│   │   └── string_matching.py
+│   ├── preprocessing/              # Data preprocessing
 │   │   ├── __init__.py
-│   │   ├── base_processor.py
-│   │   ├── hoo_processor.py
-│   │   └── ops_processor.py
-│   ├── add_manual_matches.py
-│   ├── analyze_data_quality.py
-│   ├── analyze_merged_dataset.py
-│   ├── data_loading.py
+│   │   ├── base_processor.py      # Base preprocessing class
+│   │   ├── data_normalization.py
+│   │   ├── data_preprocessing.py
+│   │   ├── hoo_processor.py       # HOO-specific processing
+│   │   ├── ops_processor.py       # OPS-specific processing
+│   │   └── schema.py
+│   ├── analyze_combined_records.py # Analysis scripts
+│   ├── analyze_match_issues.py
+│   ├── analyze_merge_completeness.py
+│   ├── analyze_record_counts.py
+│   ├── data_loading.py            # Core data operations
 │   ├── data_merging.py
-│   ├── data_normalization.py
-│   ├── enhanced_matching.py
 │   ├── find_missing_ops_records.py
-│   ├── main.py
-│   ├── preprocess_nyc_gov_hoo.py
-│   ├── schema.py
-│   └── test_pipeline.py
-├── .cursorrules
-├── .gitignore
-├── FILE_STRUCTURE.md
-├── ProjectPlan.md
-└── requirements.txt
+│   ├── main.py                    # Main execution script
+│   ├── test_pipeline.py
+│   └── verify_structure.py
+└── FILE_STRUCTURE.md              # This file
 ```
 
-## Directory Structure Overview
+## Key Components
 
-### /data
-- **analysis/**: Contains duplicate detection reports and data quality analysis
-  - `duplicates_hoo.csv`: HOO dataset duplicate records
-  - `raw_duplicates_*.csv`: Raw duplicate records from source datasets
-- **exports/**: Final output datasets for external use
-- **intermediate/**: Temporary processing results and merged datasets
-- **processed/**: Cleaned and transformed datasets
-  - `consolidated_matches.csv`: Confirmed matches between datasets
-  - `final_deduplicated_dataset.csv`: Final deduplicated agency records
-  - `nyc_agencies_export.csv`: Primary dataset
-- **raw/**: Original unmodified input data files
+### Analysis Tools
+- `analyze_match_issues.py`: Identifies problematic entity combinations
+- `analyze_combined_records.py`: Analyzes records that were combined
+- `analyze_merge_completeness.py`: Checks for missing records
+- `analyze_record_counts.py`: Validates record counts
+- `name_transformation_analyzer.py`: Analyzes name transformations
+- `quality_checker.py`: Checks data quality
+- `dataset_validator.py`: Validates dataset structure
+- `match_validator.py`: Validates matches
 
-### /docs
-- Documentation including data dictionary
+### Core Processing
+- `matcher.py`: Entity matching logic
+- `normalizer.py`: Name normalization rules
+- `data_merging.py`: Data merging operations
+- `enhanced_matching.py`: Advanced matching algorithms
+- `string_matching.py`: String similarity functions
 
-### /src
-- **analysis/**: Data quality and analysis modules
-  - `quality_checker.py`: Data quality validation
-- **matching/**: Name matching and normalization logic
-  - `matcher.py`: Core matching algorithm
-  - `normalizer.py`: Name standardization rules
-- **preprocessing/**: Data source-specific processors
-  - `base_processor.py`: Common processing functionality
-  - `hoo_processor.py`: HOO dataset processor
-  - `ops_processor.py`: OPS dataset processor
-
-## Data Flow
+### Data Flow
 1. Raw data loaded from `/data/raw`
-2. Processed by source-specific processors in `/src/preprocessing`
-3. Merged and normalized in intermediate steps
-4. Matches identified and confirmed
-5. Final deduplicated dataset generated
+2. Processed through source-specific processors
+3. Merged into intermediate dataset
+4. Matches identified and applied
+5. Final deduplicated dataset produced
 
-## Key Files
-- `main.py`: Primary execution script
-- `data_merging.py`: Dataset merging logic
-- `data_normalization.py`: Name standardization rules
-- `test_pipeline.py`: Pipeline validation tests
+### Project Plans
+- `EntityMatchingPlan.md`: Current focused plan for fixing entity matching
+- `OriginalPlan.md`: Original broader project plan

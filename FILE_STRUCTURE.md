@@ -1,6 +1,3 @@
-# Project File Structure
-
-```
 agency-name-project/
 ├── data/
 │   ├── analysis/                    # Analysis outputs
@@ -31,7 +28,7 @@ agency-name-project/
 │   └── data_dictionary.csv
 ├── project_plans/                  # Project documentation
 │   ├── EntityMatchingPlan.md       # Current focused plan
-│   └── OriginalPlan.md            # Original broader plan
+│   └── OriginalPlan.md             # Original broader plan
 ├── src/
 │   ├── analysis/                   # Analysis tools
 │   │   ├── dataset_validator.py
@@ -65,26 +62,25 @@ agency-name-project/
 │   ├── test_pipeline.py
 │   └── verify_structure.py
 └── FILE_STRUCTURE.md              # This file
-```
 
 ## Key Components
 
 ### Analysis Tools
-- `analyze_match_issues.py`: Identifies problematic entity combinations
-- `analyze_combined_records.py`: Analyzes records that were combined
-- `analyze_merge_completeness.py`: Checks for missing records
-- `analyze_record_counts.py`: Validates record counts
-- `name_transformation_analyzer.py`: Analyzes name transformations
-- `quality_checker.py`: Checks data quality
-- `dataset_validator.py`: Validates dataset structure
-- `match_validator.py`: Validates matches
+- **analyze_match_issues.py**: Identifies problematic entity combinations
+- **analyze_combined_records.py**: Analyzes combined records
+- **analyze_merge_completeness.py**: Checks for missing records
+- **analyze_record_counts.py**: Validates record counts
+- **name_transformation_analyzer.py**: Analyzes name transformations
+- **quality_checker.py**: Checks data quality
+- **dataset_validator.py**: Validates dataset structure
+- **match_validator.py**: Validates matches
 
 ### Core Processing
-- `matcher.py`: Entity matching logic
-- `normalizer.py`: Name normalization rules
-- `data_merging.py`: Data merging operations
-- `enhanced_matching.py`: Advanced matching algorithms
-- `string_matching.py`: String similarity functions
+- **matcher.py**: Entity matching logic
+- **normalizer.py**: Name normalization rules
+- **data_merging.py**: Data merging operations
+- **enhanced_matching.py**: Advanced matching algorithms
+- **string_matching.py**: String similarity functions
 
 ### Data Flow
 1. Raw data loaded from `/data/raw`
@@ -94,5 +90,5 @@ agency-name-project/
 5. Final deduplicated dataset produced
 
 ### Project Plans
-- `EntityMatchingPlan.md`: Current focused plan for fixing entity matching
-- `OriginalPlan.md`: Original broader project plan
+- **EntityMatchingPlan.md**: Current focused plan
+- **OriginalPlan.md**: Original broader plan

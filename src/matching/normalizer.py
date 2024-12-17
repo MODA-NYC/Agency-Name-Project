@@ -19,6 +19,12 @@ class NameNormalizer:
             return None
             
         name = str(name).lower().strip()
+        
+        # Early replacements before other cleaning
+        name = re.sub(r'\bnyc\b', 'new york city', name)
+        name = name.replace('+', 'and')
+        
+        # Apply other normalization patterns
         name = self.patterns['nyc'].sub('', name)
         name = self.patterns['dept'].sub(r'\1 department', name)
         name = self.patterns['office'].sub(r'\1 office', name)

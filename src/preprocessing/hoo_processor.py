@@ -45,4 +45,8 @@ class HooDataProcessor(BaseDataProcessor):
         # Apply full normalization from data_normalization.py
         df['NameNormalized'] = df['NameNormalized'].apply(full_standardize_name)
         
+        # Add RecordID column if it doesn't exist
+        if 'RecordID' not in df.columns:
+            df['RecordID'] = df.index.map(lambda x: f'HOO_{x:06d}')
+        
         return df

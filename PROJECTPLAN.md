@@ -1,70 +1,63 @@
-# PROJECTPLAN.md
-
 ## Overview
 
-This project’s ultimate goal is to create a single, standardized, and authoritative dataset of New York City government organization names by integrating and cleaning multiple sources. The process includes initial per-source preprocessing, merging datasets, normalization and standardization, fuzzy matching for deduplication, and comprehensive quality checks.
+This project aims to produce a single, standardized, authoritative dataset of New York City government organization names. We will integrate multiple sources, apply robust normalization and deduplication, and perform fuzzy matching to ensure data quality. Quality checks, documentation, and iterative improvements guide this process.
 
 ## Project History & Current Work
 
 **Phase 1 (Completed in Colab):**  
-- Integrated initial data sources into a single combined dataset.
-- Developed a preliminary standardized export called `nyc_agencies_export.csv`.
-- Created initial normalization logic and basic deduplication.
+- Integrated initial data sources and produced a preliminary standardized export (`nyc_agencies_export.csv`).
+- Developed initial normalization and basic deduplication logic.
 
-**Phase 2 (In Progress, Modular Refactoring):**  
-- Introducing new data sources (`nyc_gov_hoo.csv`, `ops_data.csv`).
-- Migrating to a structured, modular Python codebase with `src/` directories.
-- Enhancing normalization and fuzzy matching techniques specific to NYC agencies.
-- Updating tests to ensure normalization correctness and robust data preprocessing.
+**Phase 2 (In Progress, Modular Refactoring & Additional Data Sources):**  
+- Introduced new sources (`nyc_gov_hoo.csv`, `ops_data.csv`).
+- Restructured code into a modular Python codebase (`src/` directories).
+- Established source-level normalization and successfully merged datasets into a single intermediate dataset.
+- Updated tests to ensure correctness of initial normalization and merging.
 
 ## Project Plan
 
-Below is an outline of major tasks, milestones, and their purposes. Where relevant, tasks have been refined based on insights from recent testing and strategy sessions.
+**Data Preprocessing & Integration**
 
-### Data Preprocessing & Integration
+- **Task A1: Source-Level Normalization**  
+  Implement per-source normalization in `ops_processor.py` and `hoo_processor.py` to produce a `NameNormalized` column.
 
-**Task A1: Refine Source-Specific Normalization Rules in Preprocessing**   
-- Implement initial, source-specific normalization rules in `ops_processor.py` and `hoo_processor.py`. These rules should handle straightforward transformations (lowercasing, basic punctuation removal, replacing `&` with `and`, handling common abbreviations) and produce a `NameNormalized` column.  
+- **Task A2: Merge Preprocessed Datasets**  
+  Combine all preprocessed data (including new sources) into a single intermediate dataset.  
+  Ensure consistent schema (including `NameNormalized` and `RecordID`) to enable global normalization.
 
-**Task A2: Comprehensive Merging of Preprocessed Datasets**  
-- Merge all preprocessed datasets (including the newly integrated `nyc_gov_hoo.csv` and `ops_data.csv`) into a single intermediate dataset.  
-- Handle any schema alignment, ensuring that all essential fields (e.g., `NameNormalized`, `RecordID`) are present.  
-- This merged intermediate dataset sets the stage for a global normalization pass if needed.
+- **Task A3: Global Normalization & Standardization** (Next Step)  
+  Re-apply and refine normalization rules across the merged dataset.  
+  Address edge cases (e.g., parentheses, special abbreviations, final stopword decisions).  
+  Prepare the dataset for accurate fuzzy matching by preserving necessary terms and ensuring consistent formatting.
 
-**Task A3 (Future): Secondary Normalization & Standardization**  
-- Once merged, re-apply normalization logic at a global scale to ensure consistency across all sources.  
-- This may include handling edge cases discovered after merging (e.g., removing parentheses consistently, unifying abbreviations, applying final transformations now that all data is visible in one place).
+**Matching & Deduplication**
 
-### Matching & Deduplication
+- **Task B1: Fuzzy Matching Logic & Thresholds**  
+  After global normalization, tune fuzzy matching thresholds and heuristics.  
+  Document logic and thresholds for reproducibility.
 
-**Task B1: Fuzzy Matching Thresholds & Logic**  
-- Fine-tune fuzzy matching logic and thresholds after the merged dataset is fully normalized.  
-- Document thresholds and heuristics.
+- **Task B2: Deduplication & Provenance**  
+  Deduplicate records to ensure each organization is unique.  
+  Track provenance and maintain `RecordID` fields across merges and transformations.
 
-**Task B2: Deduplication & Provenance Tracking**  
-- Deduplicate the combined dataset, ensuring that each unique organization is represented once.  
-- Preserve `RecordID` fields and ensure that source origin (provenance) is tracked.
+**Analysis & Validation**
 
-### Analysis & Validation
+- **Task C1: Validation & Reporting**  
+  Produce reports on duplicates, missing records, and suspicious matches.  
+  Confirm integrity and correctness of the final dataset.
 
-**Task C1: Validation & Reporting**  
-- Produce validation reports on duplicates, missing records, suspicious matches.  
-- Implement scripts to check final dataset integrity and correctness.
-
-**Task C2: Data Dictionary & Schema Updates**  
-- Update `data_dictionary.csv` with finalized fields and normalization rules.
-- Document final naming conventions and any transformations applied at each stage.
+- **Task C2: Data Dictionary & Documentation**  
+  Update `data_dictionary.csv` with finalized fields and normalization rules.  
+  Record naming conventions and transformations.
 
 ## Current Status & Recommendations
 
-- **Normalization Test Improvements:**  
-  We’ve introduced new tests verifying that source-level normalization (A1) is functioning correctly and producing expected outputs for representative test cases.
-  
-- **Warnings & Future Refinement:**  
-  Current warnings from the processors highlight potential normalization improvements. However, the tests are passing, confirming that we’ve met the initial normalization requirements for each source.
-  
-- **Readiness for Task A2:**  
-  With source-specific normalization (A1) now verified and a clearer strategy in place—performing a global normalization pass after merging—it’s reasonable to proceed to Task A2. In A2, you’ll merge the datasets, see them in aggregate, and then determine whether additional normalization steps are needed before matching and deduplication.
+- **Source-Level Tests Passed:**  
+  Source-specific normalization (A1) and initial merging (A2) are complete.
+
+- **Next Steps (Task A3):**  
+  Perform a global normalization pass on the merged dataset, resolving edge cases and ensuring uniformity.  
+  Fine-tune stopwords and final transformations to support accurate fuzzy matching and deduplication in the following tasks.
 
 **Conclusion:**  
-You have a solid baseline for initial normalization and thorough testing at the source level. The next logical step is Task A2: merging datasets. After merging, you can revisit normalization for a global standard, guided by the warnings and patterns observed so far. This approach ensures continuous improvement while maintaining a steady forward momentum in the project.
+You have a stable intermediate dataset. Now proceed with Task A3: apply global normalization, refine naming conventions, and finalize transformations. This will pave the way for fuzzy matching and deduplication, ultimately leading to a standardized and authoritative dataset.

@@ -3,11 +3,16 @@ import re
 def standardize_name(name):
     if not isinstance(name, str):
         return ''
-    # Convert to lowercase
+    # Convert to lowercase first
     name = name.lower()
+    
+    # Early replacements before other cleaning
+    name = re.sub(r'\bnyc\b', 'new york city', name)
+    name = name.replace('+', 'and')
+    
     # Remove content in parentheses
     name = re.sub(r'\(.*?\)', '', name)
-    # Remove possessives, e.g., "mayor's" -> "mayor"
+    # Remove possessives
     name = re.sub(r"'s\b", '', name)
     # Replace '&' with 'and'
     name = name.replace('&', 'and')
@@ -15,6 +20,7 @@ def standardize_name(name):
     name = re.sub(r'[^\w\s]', '', name)
     # Remove extra whitespace
     name = ' '.join(name.split())
+    
     # Expand common abbreviations
     abbreviations = {
         'dept': 'department',
@@ -33,12 +39,15 @@ def standardize_name(name):
         'nyc': 'new york city',
         # Add more abbreviations as needed
     }
+    
     # Expand abbreviations
     words = name.split()
     expanded_words = [abbreviations.get(word, word) for word in words]
     name = ' '.join(expanded_words)
+    
     # Remove common stopwords
     stopwords = {'the', 'of', 'for', 'and', 'to', 'a', 'in', 'on', 'office'}
     words = [word for word in name.split() if word not in stopwords]
     name = ' '.join(words)
+    
     return name.strip()

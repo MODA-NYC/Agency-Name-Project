@@ -33,12 +33,14 @@ def merge_dataframes(primary_df, secondary_dfs, on_column='NameNormalized', how=
     }
     
     # Ensure primary_df has NameNormalized
-    if 'NameNormalized' not in result.columns and 'Name' in result.columns:
-        result['NameNormalized'] = result['Name'].apply(normalizer.normalize)
+    if 'NameNormalized' not in result.columns:
+        if 'Name' in result.columns:
+            result['NameNormalized'] = result['Name'].apply(normalizer.normalize)
+        else:
+            raise ValueError("Neither 'NameNormalized' nor 'Name' column found in primary dataset.")
     
     # Ensure RecordID exists
-    if 'RecordID' not in result.columns:
-        result['RecordID'] = [f'REC_{i:06d}' for i in range(len(result))]
+    result = ensure_record_ids(result, prefix='REC_')
     
     def clean_agency_name(name: str) -> str:
         """Clean agency name and prevent splitting on common separators."""
@@ -58,8 +60,7 @@ def merge_dataframes(primary_df, secondary_dfs, on_column='NameNormalized', how=
             df_to_merge['Agency Name'] = df_to_merge['Agency Name'].apply(clean_agency_name)
         
         # Add RecordID if not present
-        if 'RecordID' not in df_to_merge.columns:
-            df_to_merge['RecordID'] = [f'REC_{i:06d}' for i in range(len(df_to_merge))]
+        df_to_merge = ensure_record_ids(df_to_merge, prefix='REC_')
         
         # Verify all required columns exist
         missing_cols = [col for col in fields_to_keep if col not in df_to_merge.columns]
@@ -76,6 +77,13 @@ def merge_dataframes(primary_df, secondary_dfs, on_column='NameNormalized', how=
                 if old_col in df_to_merge.columns:
                     df_to_merge[new_col] = df_to_merge[old_col]
                     df_to_merge = df_to_merge.drop(columns=[old_col])
+        
+        # Ensure NameNormalized column
+        if 'NameNormalized' not in df_to_merge.columns:
+            if 'Agency Name' in df_to_merge.columns:
+                df_to_merge['NameNormalized'] = df_to_merge['Agency Name'].apply(normalizer.normalize)
+            else:
+                raise ValueError(f"Could not create 'NameNormalized' in {prefix} dataset due to missing fields.")
         
         result = pd.merge(result, df_to_merge, on=on_column, how=how)
     
@@ -116,11 +124,16 @@ def track_data_provenance(merged_df):
     return merged_df
 
 def ensure_record_ids(df: pd.DataFrame, prefix: str = 'REC_') -> pd.DataFrame:
-    """Ensure all records have proper IDs."""
+    """Ensure all records have proper IDs, creating them if necessary."""
     if 'RecordID' not in df.columns:
         df['RecordID'] = [f"{prefix}{i:06d}" for i in range(len(df))]
     else:
         # Fix invalid IDs
-        mask = ~df['RecordID'].str.match(r'REC_\d{6}$', na=True)
-        df.loc[mask, 'RecordID'] = [f"{prefix}{i:06d}" for i in range(sum(mask))]
+        mask = ~df['RecordID'].astype(str).str.match(r'^REC_\d{6}$', na=True)
+        if mask.any():
+            # Reassign these invalid IDs
+            invalid_count = mask.sum()
+            logging.info(f"Fixing {invalid_count} invalid RecordIDs.")
+            new_ids = [f"{prefix}{i:06d}" for i in range(invalid_count)]
+            df.loc[mask, 'RecordID'] = new_ids
     return df

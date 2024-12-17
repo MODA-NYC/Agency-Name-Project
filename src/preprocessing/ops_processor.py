@@ -1,5 +1,6 @@
 import pandas as pd
 from .base_processor import BaseDataProcessor
+from .data_normalization import standardize_name as full_standardize_name
 
 class OpsDataProcessor(BaseDataProcessor):
     """Processor for ops_data.csv with source-specific logic."""
@@ -24,17 +25,10 @@ class OpsDataProcessor(BaseDataProcessor):
         # Handle known duplicates based on rules
         df = self.handle_known_duplicates(df)
         
-        # Handle normalization duplicates
+        # Handle normalization duplicates - creates 'NameNormalized'
         df = self.handle_normalization_duplicates(df, 'Agency Name')
         
+        # Apply full normalization from data_normalization.py
+        df['NameNormalized'] = df['NameNormalized'].apply(full_standardize_name)
+        
         return df
-    
-    def handle_known_duplicates(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Apply predefined rules for known duplicates."""
-        for name, rule in self.known_duplicates.items():
-            mask = df['Agency Name'] == name
-            if rule == 'keep_first':
-                df = df[~(mask & df.duplicated(['Agency Name'], keep='first'))]
-            elif rule == 'keep_latest':
-                df = df[~(mask & df.duplicated(['Agency Name'], keep='last'))]
-        return df 

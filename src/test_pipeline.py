@@ -1,6 +1,7 @@
 import os
 import logging
 import pandas as pd
+import tempfile
 from pathlib import Path
 
 def test_file_structure():
@@ -75,6 +76,67 @@ def test_matcher():
     matches = matcher.find_matches(test_df1, test_df2)
     assert len(matches) > 0, "Matcher failed to find any matches"
 
+def test_normalization_thoroughness():
+    """
+    Test that the normalization logic truly normalizes agency names as expected.
+    We will create a temporary CSV with known inputs and expected normalized outputs,
+    run the processor on it, and then check if the actual normalized results match expectations.
+    """
+    from preprocessing.ops_processor import OpsDataProcessor
+
+    # Known input-to-expected-output pairs.
+    # Adjust expected outputs according to your actual normalization rules.
+    test_cases = [
+        # Example assumptions:
+        #  - Convert "NYC" or "+" to something standardized
+        #  - Replace '&' with 'and'
+        #  - Remove punctuation and parentheses
+        #  - Ensure all lowercase
+        (
+            "NYC Health + Hospitals",
+            "new york city health and hospitals"
+        ),
+        (
+            "Mayor's Office of Citywide Events Coordination & Management",
+            "mayors office of citywide events coordination and management"
+        ),
+        (
+            "Jamaica Bay - Rockaway Parks Conservancy, Inc.",
+            "jamaica bay rockaway parks conservancy inc"
+        ),
+        (
+            "Atlantic Yards Community Development Corporation (AYCDC)",
+            "atlantic yards community development corporation aycdc"
+        ),
+        (
+            "Technology and Innovation, NYC Office of (OTI)",
+            "technology and innovation new york city office of oti"
+        )
+    ]
+
+    df_input = pd.DataFrame({"Agency Name": [tc[0] for tc in test_cases]})
+    with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as tmp_file:
+        temp_path = tmp_file.name
+        df_input.to_csv(temp_path, index=False)
+    
+    try:
+        # Process using OPS processor (as a representative test)
+        ops_processor = OpsDataProcessor()
+        df_processed = ops_processor.process(temp_path)
+
+        # Ensure NameNormalized is present
+        assert 'NameNormalized' in df_processed.columns, "NameNormalized column not found after processing."
+
+        # Check each expected normalization
+        for i, (_, expected) in enumerate(test_cases):
+            actual = df_processed.iloc[i]['NameNormalized']
+            assert actual == expected, f"Normalization mismatch.\nInput: {test_cases[i][0]}\nExpected: {expected}\nGot: {actual}"
+
+    finally:
+        # Clean up temp file
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+
 def main():
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger(__name__)
@@ -85,9 +147,12 @@ def main():
         
         logger.info("Testing processors...")
         test_processors()
-        
+
         logger.info("Testing matcher...")
         test_matcher()
+
+        logger.info("Testing normalization thoroughness...")
+        test_normalization_thoroughness()
         
         logger.info("All tests passed successfully!")
         logger.info("You can now run main.py safely.")
@@ -97,5 +162,6 @@ def main():
     except Exception as e:
         logger.error(f"Unexpected error: {e}")
 
+
 if __name__ == "__main__":
-    main() 
+    main()

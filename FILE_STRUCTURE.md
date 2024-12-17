@@ -1,4 +1,5 @@
-agency-name-project/
+```md
+Agency-Name-Project-main/
 ├── data/
 │   ├── analysis/                    # Analysis outputs
 │   │   ├── combined_records_analysis.csv
@@ -26,8 +27,8 @@ agency-name-project/
 │       └── ops_data.csv
 ├── docs/
 │   └── data_dictionary.csv
-├── project_plans/                  # Project documentation
-│   ├── EntityMatchingPlan.md       # Current focused plan
+├── project_plans_old/              # Old project documentation
+│   ├── EntityMatchingPlan.md       # Previously focused plan
 │   └── OriginalPlan.md             # Original broader plan
 ├── src/
 │   ├── analysis/                   # Analysis tools
@@ -42,7 +43,8 @@ agency-name-project/
 │   │   ├── enhanced_matching.py
 │   │   ├── matcher.py             # Core matching algorithm
 │   │   ├── normalizer.py          # Name normalization
-│   │   └── string_matching.py
+│   │   ├── string_matching.py
+│   │   └── string_similarity.py
 │   ├── preprocessing/              # Data preprocessing
 │   │   ├── __init__.py
 │   │   ├── base_processor.py      # Base preprocessing class
@@ -51,16 +53,25 @@ agency-name-project/
 │   │   ├── hoo_processor.py       # HOO-specific processing
 │   │   ├── ops_processor.py       # OPS-specific processing
 │   │   └── schema.py
+│   ├── add_manual_matches.py
 │   ├── analyze_combined_records.py # Analysis scripts
 │   ├── analyze_match_issues.py
 │   ├── analyze_merge_completeness.py
+│   ├── analyze_missing_records.py
+│   ├── analyze_match_rate.py
 │   ├── analyze_record_counts.py
+│   ├── create_entity_mapping.py
 │   ├── data_loading.py            # Core data operations
 │   ├── data_merging.py
+│   ├── data_preparation.py
 │   ├── find_missing_ops_records.py
+│   ├── find_missing_records.py
 │   ├── main.py                    # Main execution script
+│   ├── match_generator.py
+│   ├── matching_algorithm.py
+│   ├── preprocess_nyc_gov_hoo.py
 │   ├── test_pipeline.py
-│   └── verify_structure.py
+│   ├── verify_structure.py
 └── FILE_STRUCTURE.md              # This file
 
 ## Key Components
@@ -81,14 +92,15 @@ agency-name-project/
 - **data_merging.py**: Data merging operations
 - **enhanced_matching.py**: Advanced matching algorithms
 - **string_matching.py**: String similarity functions
+- **string_similarity.py**: Additional similarity scoring methods
 
 ### Data Flow
 1. Raw data loaded from `/data/raw`
-2. Processed through source-specific processors
+2. Processed through source-specific processors (e.g., `ops_processor.py`, `hoo_processor.py`)
 3. Merged into intermediate dataset
 4. Matches identified and applied
 5. Final deduplicated dataset produced
 
-### Project Plans
-- **EntityMatchingPlan.md**: Current focused plan
-- **OriginalPlan.md**: Original broader plan
+### Old Project Plans
+- **EntityMatchingPlan.md**: Previously focused matching plan
+- **OriginalPlan.md**: Original broader plan documentation

@@ -28,6 +28,9 @@ class HooDataProcessor(BaseDataProcessor):
         """Complete processing pipeline for HOO data."""
         df = pd.read_csv(input_path)
 
+        # Strip whitespace from column names
+        df.columns = df.columns.str.strip()
+
         # Check raw duplicates
         raw_dupes = self.check_raw_duplicates(df, ['Agency Name'])
 

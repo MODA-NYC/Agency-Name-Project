@@ -1,6 +1,20 @@
 import re
 
 def standardize_name(name):
+    """
+    Standardizes a raw agency name string by:
+      - Converting to lowercase
+      - Expanding 'NYC' to 'new york city'
+      - Replacing '+'/'&' with 'and'
+      - Removing parentheses and any text inside them (including acronyms)
+      - Removing punctuation
+      - Removing extra whitespace
+      - Expanding known abbreviations (dept -> department, etc.)
+      - Preserving core words (e.g. 'new', 'york', 'city') for further normalization
+
+    This function ensures that any acronyms present within parentheses
+    (e.g., "(OTI)") are removed from the final `NameNormalized` string.
+    """
     if not isinstance(name, str):
         return ''
     # Convert to lowercase
@@ -13,7 +27,7 @@ def standardize_name(name):
     name = name.replace('+', 'and')
     name = name.replace('&', 'and')
 
-    # Remove parentheses and their contents
+    # Remove parentheses and their contents (this drops acronyms)
     name = re.sub(r'\(.*?\)', '', name)
 
     # Remove punctuation (other than spaces)
@@ -45,11 +59,8 @@ def standardize_name(name):
     name = ' '.join(expanded_words)
 
     # Baseline stopwords removal
-    # Previously we removed 'the', 'of', 'for', 'and', 'to', 'a', 'in', 'on', 'office'
-    # For global normalization, let's consider retaining 'and' and 'office' 
-    # to preserve structural meaning for matching.
-    # Remove minimal stopwords: 'the', 'of', 'for', 'to', 'a', 'in', 'on'
-    stopwords = {'the', 'of', 'for', 'to', 'a', 'in', 'on'}
+    # Remove minimal stopwords, excluding 'of' to preserve agency name structure
+    stopwords = {'the', 'for', 'to', 'a', 'in', 'on'}  # 'of' purposely excluded
     words = [w for w in name.split() if w not in stopwords]
     name = ' '.join(words)
 
@@ -62,11 +73,9 @@ def global_normalize_name(name: str) -> str:
     globally-aware decisions now that all data is integrated.
 
     Enhancements for global step:
-    - Ensure 'new york city' is preserved if present.
-    - Retain 'and' and 'office' to preserve essential structure.
-    - Confirm special terms like 'commission', 'department', 'authority' remain.
-    - Remove extraneous punctuation and parentheses again if any remain.
-    - Consider future improvements if needed.
+    - Ensures 'new york city' is preserved if present.
+    - Retains relevant words like 'office', 'department', 'commission'.
+    - Also removes acronyms in parentheses as part of the baseline standardization.
 
     Returns:
         str: A globally normalized name string.
@@ -78,13 +87,6 @@ def global_normalize_name(name: str) -> str:
     normalized = standardize_name(name)
 
     # Additional global refinements:
-    # Ensure 'new york city' remains as a single unit if present
-    # Already handled by early replacements, but let's ensure no further splitting:
-    # If after standardization 'new', 'york', 'city' appear separately, it's fine 
-    # as long as they remain together. No special handling needed now.
-
-    # TODO: Future steps: handle acronyms and canonical forms across all data sources.
-    # e.g., If we find 'hhs' frequently standing for 'health and human services',
-    # we could expand it here in a future iteration.
-
+    # (Currently no extra global changes beyond what's in standardize_name().
+    # Future steps might handle cross-source canonical forms or advanced expansions.)
     return normalized

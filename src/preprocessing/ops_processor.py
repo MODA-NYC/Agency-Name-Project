@@ -25,18 +25,8 @@ class OpsDataProcessor(BaseDataProcessor):
         # Handle known duplicates based on rules
         df = self.handle_known_duplicates(df)
 
-        # Create AgencyNameEnriched by combining Agency Name and Entity type if available
-        if 'Entity type' in df.columns and df['Entity type'].notna().any():
-            df['AgencyNameEnriched'] = df.apply(
-                lambda row: f"{row['Agency Name']} - {row['Entity type']}"
-                if pd.notna(row['Entity type']) else row['Agency Name'],
-                axis=1
-            )
-        else:
-            df['AgencyNameEnriched'] = df['Agency Name']
-
-        # Handle normalization duplicates - now use AgencyNameEnriched for normalization
-        df['NameNormalized'] = df['AgencyNameEnriched'].apply(full_standardize_name)
+        # Create normalized name column directly from Agency Name
+        df['NameNormalized'] = df['Agency Name'].apply(full_standardize_name)
 
         # Add RecordID column if it doesn't exist
         if 'RecordID' not in df.columns:

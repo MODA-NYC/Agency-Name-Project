@@ -8,6 +8,7 @@ from preprocessing.hoo_processor import HooDataProcessor
 from matching.matcher import AgencyMatcher
 from analysis.quality_checker import DataQualityChecker
 from data_merging import merge_dataframes, clean_merged_data, track_data_provenance, ensure_record_ids
+from preprocessing.global_normalization import apply_global_normalization  # Newly imported for global normalization
 
 def validate_dataframe_columns(df: pd.DataFrame, required_cols: List[str], df_name: str) -> None:
     """Validate that required columns exist in DataFrame."""
@@ -43,37 +44,34 @@ def main(data_dir: str, log_level: str, display: bool, save: bool):
             if not os.path.exists(path):
                 raise FileNotFoundError(f"Required file not found: {path}")
         
-        # Process each data source with validation
+        # Process each data source
         logger.info("Processing OPS data...")
         ops_data = ops_processor.process(required_files['ops_data'])
         validate_dataframe_columns(ops_data, ['Agency Name', 'NameNormalized', 'RecordID'], 'ops_data')
-        
+        logger.info(f"OPS data records: {len(ops_data)}")
+
         logger.info("Processing HOO data...")
         hoo_data = hoo_processor.process(required_files['hoo_data'])
         validate_dataframe_columns(hoo_data, ['Agency Name', 'NameNormalized', 'RecordID'], 'hoo_data')
-        
+        logger.info(f"HOO data records: {len(hoo_data)}")
+
         # Load and validate primary data source
         nyc_agencies_export = pd.read_csv(required_files['nyc_agencies'])
         validate_dataframe_columns(nyc_agencies_export, ['Name'], 'nyc_agencies_export')
+        logger.info(f"NYC agencies export records: {len(nyc_agencies_export)}")
         
         # Merge datasets
         logger.info("Merging datasets...")
-        
-        # Define desired columns but handle missing ones
-        hoo_desired_columns = ['Agency Name', 'NameNormalized', 'RecordID']
-        hoo_optional_columns = ['HeadOfOrganizationName', 'HeadOfOrganizationTitle', 'HeadOfOrganizationURL']
-        
-        # Add optional columns that exist
-        hoo_columns = hoo_desired_columns + [col for col in hoo_optional_columns if col in hoo_data.columns]
-        
         secondary_dfs = [
-            (hoo_data, hoo_columns, 'nyc_gov_'),
-            (ops_data, ['Agency Name', 'NameNormalized', 'RecordID'], 'ops_')
+            (hoo_data, ['Agency Name','AgencyNameEnriched','NameNormalized','RecordID','HeadOfOrganizationName','HeadOfOrganizationTitle','HeadOfOrganizationURL'], 'nyc_gov_'),
+            (ops_data, ['Agency Name','AgencyNameEnriched','NameNormalized','RecordID','Entity type'], 'ops_')
         ]
-        
-        # Merge and clean
         merged_df = merge_dataframes(nyc_agencies_export, secondary_dfs)
+        logger.info(f"Merged dataset row count (pre-clean): {len(merged_df)}")
+        
         merged_df = clean_merged_data(merged_df)
+        logger.info(f"Merged dataset row count (post-clean): {len(merged_df)}")
+        
         merged_df = track_data_provenance(merged_df)
         
         # Ensure NameNormalized and RecordID exist
@@ -85,18 +83,20 @@ def main(data_dir: str, log_level: str, display: bool, save: bool):
                 raise ValueError("No 'Name' column to derive 'NameNormalized' from.")
         
         merged_df = ensure_record_ids(merged_df, prefix='REC_')
+
+        # Apply global normalization to finalize NameNormalized
+        merged_df = apply_global_normalization(merged_df)
         
-        # Remove duplicates based on RecordID to avoid record inflation
+        # Deduplicate based on RecordID
         before_dedup = len(merged_df)
         merged_df = merged_df.drop_duplicates(subset=['RecordID'], keep='first')
         after_dedup = len(merged_df)
-        if before_dedup != after_dedup:
-            logger.info(f"Removed {before_dedup - after_dedup} duplicate records based on RecordID.")
+        logger.info(f"Removed {before_dedup - after_dedup} duplicate records based on RecordID.")
         
         # Save merged dataset
         merged_path = os.path.join(data_dir, 'intermediate', 'merged_dataset.csv')
         merged_df.to_csv(merged_path, index=False)
-        logger.info(f"Merged dataset saved to {merged_path}")
+        logger.info(f"Merged dataset saved to {merged_path}. Final row count: {len(merged_df)}")
         
         # Run quality checks
         logger.info("Running quality checks...")

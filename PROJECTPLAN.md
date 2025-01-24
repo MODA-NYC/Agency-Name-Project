@@ -19,60 +19,76 @@ This project aims to produce a single, standardized, authoritative dataset of Ne
 
 ## Project Plan
 
-**Data Preprocessing & Integration**
+## 1. Preprocessing & Source-Level Normalization
 
-- **Task A1: Source-Level Normalization** ✓  
-  Implement per-source normalization in `ops_processor.py` and `hoo_processor.py` to produce a `NameNormalized` column.
+**Objective**: Convert raw CSV data into consistently normalized DataFrames, each with a clear `RecordID`, a normalized name column (`NameNormalized`), and any necessary source-specific fields.
 
-- **Task A2: Merge Preprocessed Datasets** ✓  
-  Combine all preprocessed data (including new sources) into a single intermediate dataset.  
-  Ensure consistent schema (including `NameNormalized` and `RecordID`) to enable global normalization.
+1. **OPS Processor** (`src/preprocessing/ops_processor.py`)  
+   - Load `ops_data.csv` from `data/raw/`.
+   - Deduplicate, handle known duplicates (if any remain).
+   - Normalize names (`NameNormalized`) with relevant expansions/abbreviations.
 
-- **Task A3: Global Normalization & Multi-Field Enrichment** (Current Focus)  
-  **Goal:** Ensure that the `NameNormalized` field incorporates additional distinguishing attributes before global normalization.
-  
-  **Actions:**
-  1. Adjust Source Processing Scripts:
-     - Enhance `hoo_processor.py` to create `AgencyNameEnriched` field combining AgencyName and HoOTitle
-     - Update `ops_processor.py` and other processors as needed
-  2. Update Normalization Logic:
-     - Normalize `AgencyNameEnriched` fields instead of just Agency Name
-     - Ensure `NameNormalized` reflects these enriched fields
-  3. Re-run Merging & Global Normalization:
-     - Re-merge datasets with updated processors
-     - Apply global normalization script on enriched results
-  4. Validate Counts & Spot Checks:
-     - Verify source record counts (e.g., HOO's 179 records)
-     - Ensure alignment between source and integrated counts
+2. **HOO Processor** (`src/preprocessing/hoo_processor.py`)  
+   - Load `nyc_gov_hoo.csv` from `data/raw/`.
+   - Apply `AgencyNameEnriched` logic (e.g., combine AgencyName + HoO Title).
+   - Deduplicate, handle known duplicates.
+   - Normalize `NameNormalized` using source-specific expansions.
 
-**Matching & Deduplication**
+3. **Global Normalization** (`src/preprocessing/global_normalization.py`)  
+   - Once each source is processed, optionally run a final “global” pass to ensure consistent `NameNormalized` across all sources.  
+   - Add or refine expansions for NYC-specific terms not fully handled in each processor.
 
-- **Task B1: Fuzzy Matching Logic & Thresholds**  
-  Leverage improved global normalization to tune fuzzy matching thresholds and heuristics.  
-  Document logic and thresholds for reproducibility.
+## 2. Merging & Integration
 
-- **Task B2: Deduplication & Provenance**  
-  Deduplicate records using enriched normalization results.  
-  Track provenance and maintain `RecordID` fields across merges and transformations.
+**Objective**: Combine the preprocessed source DataFrames into a single master `merged_dataset.csv`.
 
-**Analysis & Validation**
+1. **Merging** (`src/data_merging.py`)  
+   - Load the primary dataset (e.g., `nyc_agencies_export.csv`) plus each processed DataFrame.
+   - Use consistent field mappings (e.g. `AgencyNameEnriched`) and ensure each record has a `RecordID`.
+   - Concatenate them with provenance tracking (e.g., `source` column).
 
-- **Task C1: Validation & Reporting**  
-  Produce reports on duplicates, missing records, and suspicious matches.  
-  Confirm integrity and correctness of the final dataset.
+2. **Clean & Deduplicate**  
+   - Eliminate empty rows, handle column collisions (URL fields, etc.), and remove duplicates based on `RecordID` or `NameNormalized` as appropriate.
 
-- **Task C2: Data Dictionary & Documentation**  
-  Update `data_dictionary.csv` with finalized fields and normalization rules.  
-  Record naming conventions and transformations.
+## 3. Matching & Deduplication
 
-## Current Status & Recommendations
+**Objective**: Identify near-duplicate or matching records using fuzzy matching and specialized NYC agency logic.
 
-- **Source-Level Processing Complete:**  
-  Initial source-specific normalization (A1) and merging (A2) are complete.
+1. **Core Matching**  
+   - Use `AgencyMatcher` (`src/matching/matcher.py` or `enhanced_matching.py`) to compute similarity scores above a defined threshold (e.g., 82.0).
+   - Generate a list of potential matches, store them in `consolidated_matches.csv`.
 
-- **Next Steps (Task A3):**  
-  Implement multi-field enrichment strategy to prevent unintended record collapses.  
-  Re-run global normalization with enriched fields to improve matching accuracy.
+2. **Refine & Merge Matches**  
+   - For fully confirmed matches (score = 100 or manually confirmed), unify or mark them as duplicates in the final dataset.  
+   - If partial or suspicious matches appear, log them for manual review.
 
-**Conclusion:**  
-The project has identified key challenges in maintaining distinct entity records. The revised approach using multi-field enrichment will provide a more accurate foundation for subsequent fuzzy matching and deduplication tasks, ultimately producing a more reliable standardized dataset.
+## 4. Analysis & Validation
+
+**Objective**: Perform post-merge QA checks to ensure data completeness, identify missing records, duplicates, or suspicious merges.
+
+1. **Analysis Scripts** (`src/analysis/*.py`)  
+   - **`dataset_validator.py`**: Validate final deduplicated dataset for missing IDs, required fields, etc.  
+   - **`match_validator.py`**: Check `consolidated_matches.csv` for duplicates, suspicious matches.  
+   - **`quality_checker.py`**: Summaries of data quality (null counts, duplicates, etc.).  
+   - Potential additional scripts for verifying record counts, analyzing unmatched entities, or generating summary reports.
+
+2. **Testing** (`src/test_pipeline.py`)  
+   - Run the test suite to confirm that all processors, matchers, and merges function as expected.  
+   - If needed, unify structural checks (like `verify_structure.py`) or simply remove them.
+
+## 5. Final Output & Publishing
+
+- **Finalize**: Produce `final_deduplicated_dataset.csv` once all matching and QA steps are complete.  
+- **Document**: Update `data_dictionary.csv` with any new fields or changes.  
+- **Publish**: Provide the final dataset to NYC Open Data or internal consumers.
+
+## 6. Next Steps & Maintenance
+
+1. **Enrichment of Additional Sources**  
+   - If more data sources appear in the future, replicate the pattern: write a `*_processor.py`, produce normalized output, merge, match, and analyze.
+
+2. **Automate & Schedule**  
+   - Wrap the entire pipeline (`main.py`) into a scheduled job or CI pipeline, ensuring periodic updates.
+
+3. **Ongoing QA**  
+   - Plan for periodic reviews to address new name variants, updated acronyms, or new agencies.

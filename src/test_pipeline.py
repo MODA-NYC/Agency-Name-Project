@@ -85,13 +85,7 @@ def test_normalization_thoroughness():
     from preprocessing.ops_processor import OpsDataProcessor
 
     # Known input-to-expected-output pairs.
-    # Adjust expected outputs according to your actual normalization rules.
     test_cases = [
-        # Example assumptions:
-        #  - Convert "NYC" or "+" to something standardized
-        #  - Replace '&' with 'and'
-        #  - Remove punctuation and parentheses
-        #  - Ensure all lowercase
         (
             "NYC Health + Hospitals",
             "new york city health and hospitals"
@@ -106,11 +100,11 @@ def test_normalization_thoroughness():
         ),
         (
             "Atlantic Yards Community Development Corporation (AYCDC)",
-            "atlantic yards community development corporation aycdc"
+            "atlantic yards community development corporation"
         ),
         (
             "Technology and Innovation, NYC Office of (OTI)",
-            "technology and innovation new york city office of oti"
+            "technology and innovation new york city office of"
         )
     ]
 

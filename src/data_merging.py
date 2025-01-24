@@ -1,93 +1,34 @@
 import pandas as pd
 from matching.normalizer import NameNormalizer
 import logging
+from typing import List, Tuple
 
-def merge_dataframes(primary_df, secondary_dfs, on_column='NameNormalized', how='outer'):
-    """
-    Merge multiple dataframes based on a specified column.
+def merge_dataframes(primary_df: pd.DataFrame, secondary_dfs: List[Tuple[pd.DataFrame, List[str], str]]) -> pd.DataFrame:
+    """Merge primary dataframe with all secondary dataframes.
     
     Args:
-    primary_df (pandas.DataFrame): The primary dataframe to merge onto
-    secondary_dfs (list): List of tuples (dataframe, fields_to_keep, prefix)
-    on_column (str): Column to merge on (default: 'NameNormalized')
-    how (str): Type of merge to perform (default: 'outer')
-    
-    Returns:
-    pandas.DataFrame: Merged dataframe
+        primary_df: Primary DataFrame to merge with
+        secondary_dfs: List of tuples (DataFrame, fields_to_keep, prefix)
     """
-    result = primary_df.copy()
-    normalizer = NameNormalizer()
     
-    # Standard column mappings
-    column_mappings = {
-        'ops': {
-            'Agency Name': 'Name - Ops',
-            'Agency Acronym': 'Acronym - Ops'
-        },
-        'nyc_gov': {
-            'Agency Name': 'Name - NYC.gov Redesign',
-            'Head of Organization': 'HeadOfOrganizationName',
-            'HoO Title': 'HeadOfOrganizationTitle',
-            'Agency Link (URL)': 'HeadOfOrganizationURL'
-        }
-    }
+    # Define standard fields to keep from secondary dataframes
+    standard_fields = [
+        'RecordID',
+        'Agency Name',
+        'NameNormalized'
+    ]
+
+    merged_df = primary_df.copy()
+    # Add source column to primary df
+    merged_df['source'] = 'primary'
     
-    # Ensure primary_df has NameNormalized
-    if 'NameNormalized' not in result.columns:
-        if 'Name' in result.columns:
-            result['NameNormalized'] = result['Name'].apply(normalizer.normalize)
-        else:
-            raise ValueError("Neither 'NameNormalized' nor 'Name' column found in primary dataset.")
+    for df, _, source_prefix in secondary_dfs:  # Use the prefix as source
+        df_to_merge = df[standard_fields].copy()
+        # Add source column using the prefix
+        df_to_merge['source'] = source_prefix.rstrip('_')  # Remove trailing underscore if present
+        merged_df = pd.concat([merged_df, df_to_merge], ignore_index=True)
     
-    # Ensure RecordID exists
-    result = ensure_record_ids(result, prefix='REC_')
-    
-    def clean_agency_name(name: str) -> str:
-        """Clean agency name and prevent splitting on common separators."""
-        if pd.isna(name):
-            return name
-        # Don't split on these characters
-        name = name.replace(' & ', ' and ')
-        name = name.replace(', Inc.', ' Inc')
-        name = name.replace(' - ', ' ')
-        return name.strip()
-    
-    for df, fields_to_keep, prefix in secondary_dfs:
-        df_to_merge = df[fields_to_keep].copy()
-        
-        # Clean agency names before processing
-        if 'Agency Name' in df_to_merge.columns:
-            df_to_merge['Agency Name'] = df_to_merge['Agency Name'].apply(clean_agency_name)
-        
-        # Add RecordID if not present
-        df_to_merge = ensure_record_ids(df_to_merge, prefix='REC_')
-        
-        # Verify all required columns exist
-        missing_cols = [col for col in fields_to_keep if col not in df_to_merge.columns]
-        if missing_cols:
-            logging.warning(f"Missing columns in dataset with prefix {prefix}: {missing_cols}")
-            # Use only available columns
-            fields_to_keep = [col for col in fields_to_keep if col not in missing_cols]
-            df_to_merge = df[fields_to_keep].copy()
-        
-        # Apply standard column mappings
-        source = prefix.rstrip('_')
-        if source in column_mappings:
-            for old_col, new_col in column_mappings[source].items():
-                if old_col in df_to_merge.columns:
-                    df_to_merge[new_col] = df_to_merge[old_col]
-                    df_to_merge = df_to_merge.drop(columns=[old_col])
-        
-        # Ensure NameNormalized column
-        if 'NameNormalized' not in df_to_merge.columns:
-            if 'Agency Name' in df_to_merge.columns:
-                df_to_merge['NameNormalized'] = df_to_merge['Agency Name'].apply(normalizer.normalize)
-            else:
-                raise ValueError(f"Could not create 'NameNormalized' in {prefix} dataset due to missing fields.")
-        
-        result = pd.merge(result, df_to_merge, on=on_column, how=how)
-    
-    return result
+    return merged_df
 
 def clean_merged_data(df):
     """

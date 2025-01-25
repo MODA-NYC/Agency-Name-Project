@@ -10,14 +10,18 @@ def apply_global_normalization(df: pd.DataFrame) -> pd.DataFrame:
     from 'AgencyNameEnriched' field if present.
     """
 
-    if 'AgencyNameEnriched' not in df.columns:
-        logger.warning("AgencyNameEnriched column missing. Using Name column as fallback for global normalization.")
-        source_col = 'Name' if 'Name' in df.columns else None
-    else:
-        source_col = 'AgencyNameEnriched'
+    # Define column priority for normalization
+    priority_columns = ['AgencyNameEnriched', 'Name', 'Agency Name']
+    source_col = None
+
+    for col in priority_columns:
+        if col in df.columns:
+            source_col = col
+            logger.info(f"Using {col} as source for global normalization")
+            break
 
     if source_col is None:
-        raise ValueError("No suitable column found for global normalization (missing AgencyNameEnriched and Name).")
+        raise ValueError("No suitable column found for global normalization (tried: AgencyNameEnriched, Name, Agency Name)")
 
     # Apply global normalization
     df['NameNormalized'] = df[source_col].apply(global_normalize_name)

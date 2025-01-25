@@ -21,6 +21,14 @@ Follow these guidelines:
 - `src/analysis/`: Validation, analysis, and reporting scripts.
 - Include docstrings, inline comments, and use logging (INFO for normal ops, WARN/ERROR for issues).
 
+**Path Handling & Script Execution:**
+- When running Python scripts, always consider the current working directory:
+  - From project root: Use `venv/bin/python src/script.py`
+  - From src directory: Use `../venv/bin/python script.py`
+- Never include 'src' in the path when already in the src directory
+- Use relative paths for data files (e.g., '../data/processed/')
+- Ensure all file operations use Path from pathlib for cross-platform compatibility
+
 **Data Handling:**
 - Use UTF-8 encodings and proper NA handling.
 - Deduplicate after merging to avoid record inflation.
@@ -37,4 +45,4 @@ Follow these guidelines:
 - It's acceptable if not all tests pass immediately due to evolving normalization rules. Document which issues will be addressed in future tasks.
 - Provide incremental improvements and avoid large-scale rewrites without reason.
 
-By adhering to these guidelines, you maintain a clear, scalable codebase aligned with the project’s ongoing normalization, matching, and reporting goals.
+By adhering to these guidelines, you maintain a clear, scalable codebase aligned with the project's ongoing normalization, matching, and reporting goals.

@@ -35,7 +35,7 @@ This project aims to produce a single, standardized, authoritative dataset of Ne
    - Normalize `NameNormalized` using source-specific expansions.
 
 3. **Global Normalization** (`src/preprocessing/global_normalization.py`)  
-   - Once each source is processed, optionally run a final “global” pass to ensure consistent `NameNormalized` across all sources.  
+   - Once each source is processed, optionally run a final "global" pass to ensure consistent `NameNormalized` across all sources.  
    - Add or refine expansions for NYC-specific terms not fully handled in each processor.
 
 ## 2. Merging & Integration
@@ -52,15 +52,67 @@ This project aims to produce a single, standardized, authoritative dataset of Ne
 
 ## 3. Matching & Deduplication
 
-**Objective**: Identify near-duplicate or matching records using fuzzy matching and specialized NYC agency logic.
+**Objective**: Identify and merge matching records using fuzzy matching and specialized NYC agency logic, with manual verification.
 
-1. **Core Matching**  
-   - Use `AgencyMatcher` (`src/matching/matcher.py` or `enhanced_matching.py`) to compute similarity scores above a defined threshold (e.g., 82.0).
-   - Generate a list of potential matches, store them in `consolidated_matches.csv`.
+### 3.1 Generate Potential Matches
+1. **Setup**
+   - Load deduplicated dataset from Step 2.2
+   - Initialize enhanced matcher with NYC-specific rules
+   - Configure similarity threshold (82.0)
 
-2. **Refine & Merge Matches**  
-   - For fully confirmed matches (score = 100 or manually confirmed), unify or mark them as duplicates in the final dataset.  
-   - If partial or suspicious matches appear, log them for manual review.
+2. **Match Generation**
+   - Use `AgencyMatcher` to compute similarity scores
+   - Filter matches above threshold
+   - Auto-label perfect matches (score = 100)
+   - Store in `consolidated_matches.csv`
+
+3. **Manual Review**
+   - Review generated matches
+   - Apply labels ("Match" or "No Match")
+   - Document any special cases or patterns
+
+### 3.2 Apply Verified Matches
+1. **Load & Filter**
+   - Load deduplicated dataset
+   - Load verified matches from `consolidated_matches.csv`
+   - Filter for "Match" labels
+
+2. **Process Matches**
+   - Apply source preference rules
+   - Merge record information
+   - Preserve non-null values
+   - Update metadata and tracking
+
+3. **Generate Output**
+   - Save final deduplicated dataset
+   - Create merge summary
+   - Maintain audit trail
+
+4. **Validate Results**
+   - Verify match application
+   - Check remaining duplicates
+   - Validate information preservation
+
+### 3.3 Quality Assurance
+1. **Completeness Check**
+   - Verify all required fields
+   - Check for missing records
+   - Validate metadata integrity
+
+2. **Consistency Check**
+   - Review source preferences
+   - Verify merge decisions
+   - Validate field values
+
+3. **Documentation**
+   - Update data dictionary
+   - Document merge decisions
+   - Note special cases
+
+4. **Final Review**
+   - Stakeholder review
+   - Address any concerns
+   - Prepare for publication
 
 ## 4. Analysis & Validation
 

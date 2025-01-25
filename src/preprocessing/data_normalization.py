@@ -73,9 +73,11 @@ def global_normalize_name(name: str) -> str:
     globally-aware decisions now that all data is integrated.
 
     Enhancements for global step:
-    - Ensures 'new york city' is preserved if present.
-    - Retains relevant words like 'office', 'department', 'commission'.
-    - Also removes acronyms in parentheses as part of the baseline standardization.
+    - Ensures 'new york city' is preserved if present
+    - Retains relevant words like 'office', 'department', 'commission'
+    - Standardizes organizational terms (e.g., 'dept' -> 'department')
+    - Handles special cases like 'mayors office' vs 'office of the mayor'
+    - Removes redundant terms while preserving meaning
 
     Returns:
         str: A globally normalized name string.
@@ -86,7 +88,50 @@ def global_normalize_name(name: str) -> str:
     # Start with the base standardization
     normalized = standardize_name(name)
 
-    # Additional global refinements:
-    # (Currently no extra global changes beyond what's in standardize_name().
-    # Future steps might handle cross-source canonical forms or advanced expansions.)
-    return normalized
+    # Global organizational term standardization
+    org_terms = {
+        'dept': 'department',
+        'comm': 'commission',
+        'auth': 'authority',
+        'admin': 'administration',
+        'corp': 'corporation',
+        'dev': 'development',
+        'svcs': 'services',
+        'svc': 'service',
+        'tech': 'technology',
+        'mgmt': 'management',
+        'ops': 'operations'
+    }
+
+    # Split into words for processing
+    words = normalized.split()
+    
+    # Process words
+    processed_words = []
+    i = 0
+    while i < len(words):
+        word = words[i]
+        
+        # Handle special cases
+        if i < len(words) - 1:
+            two_word = f"{word} {words[i+1]}"
+            if two_word == "mayors office":
+                processed_words.extend(["office", "of", "the", "mayor"])
+                i += 2
+                continue
+        
+        # Expand organizational terms
+        if word in org_terms:
+            processed_words.append(org_terms[word])
+        else:
+            processed_words.append(word)
+        i += 1
+
+    # Rejoin words
+    normalized = ' '.join(processed_words)
+
+    # Ensure 'new york city' is preserved if present
+    if 'new york city' in normalized:
+        normalized = normalized.replace('nyc', 'new york city')
+
+    return normalized.strip()

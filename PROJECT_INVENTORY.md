@@ -7,6 +7,7 @@
 - `.repo_ignore` - Repository-specific ignore rules
 - `IMPROVEMENT_IDEAS.md` - Documented suggestions for future enhancements
 - `README.md` - Project overview and setup instructions
+- `.github/dependabot.yml` - Dependabot configuration for security updates
 
 ## Documentation
 - `docs/data_dictionary.csv` - Definitions and descriptions of data fields

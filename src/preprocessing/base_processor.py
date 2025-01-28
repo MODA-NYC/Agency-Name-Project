@@ -1,7 +1,7 @@
 import pandas as pd
 from typing import List
 import logging
-from matching.normalizer import NameNormalizer
+from .data_normalization import standardize_name
 import re
 
 class BaseDataProcessor:
@@ -10,11 +10,10 @@ class BaseDataProcessor:
     def __init__(self, source_name: str):
         self.source_name = source_name
         self.duplicate_path = f'data/analysis/raw_duplicates_{source_name}.csv'
-        self.normalizer = NameNormalizer()
         
     def standardize_name(self, name: str) -> str:
         """Wrapper for name normalization"""
-        return self.normalizer.normalize(name)
+        return standardize_name(name)
     
     def check_raw_duplicates(self, df: pd.DataFrame, key_columns: List[str]) -> pd.DataFrame:
         """Check for duplicates in raw data and save report."""

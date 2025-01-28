@@ -5,77 +5,162 @@ from typing import List, Tuple, Dict, Optional
 import json
 import os
 
-def merge_dataframes(primary_df: pd.DataFrame, secondary_dfs: List[Tuple[pd.DataFrame, List[str], str]]) -> pd.DataFrame:
-    """Merge primary dataframe with all secondary dataframes.
+def merge_dataframes(primary_df: pd.DataFrame, ops_df: pd.DataFrame, hoo_df: pd.DataFrame) -> pd.DataFrame:
+    """Merge the three dataframes while preserving original names and tracking provenance."""
     
-    Args:
-        primary_df: Primary DataFrame to merge with
-        secondary_dfs: List of tuples (DataFrame, fields_to_keep, prefix)
-    """
+    # Create copies to avoid modifying originals
+    primary = primary_df.copy()
+    ops = ops_df.copy()
+    hoo = hoo_df.copy()
     
-    # Define standard fields to keep from secondary dataframes
-    standard_fields = [
-        'RecordID',
-        'Agency Name',
-        'NameNormalized'
-    ]
+    # Store original names before merging
+    ops['OPS_Name'] = ops['Agency Name']
+    hoo['HOO_Name'] = hoo['Agency Name']
+    
+    logging.info(f"Sample HOO_Name values before merge: {hoo['HOO_Name'].head().tolist()}")
+    logging.info(f"Sample HOO normalized names: {hoo['NameNormalized'].head().tolist()}")
+    logging.info(f"Sample primary normalized names: {primary['NameNormalized'].head().tolist()}")
+    
+    # Count potential matches
+    hoo_matches = len(set(hoo['NameNormalized']).intersection(set(primary['NameNormalized'])))
+    ops_matches = len(set(ops['NameNormalized']).intersection(set(primary['NameNormalized'])))
+    logging.info(f"Potential HOO matches: {hoo_matches}")
+    logging.info(f"Potential OPS matches: {ops_matches}")
+    
+    # Ensure all dataframes have NameNormalized column
+    for df in [primary, ops, hoo]:
+        if 'NameNormalized' not in df.columns:
+            raise ValueError("All dataframes must have NameNormalized column")
+    
+    # Define columns to keep from each source
+    ops_cols = ['RecordID', 'NameNormalized', 'OPS_Name', 'Agency Name', 'Entity type', 'source']
+    hoo_cols = ['RecordID', 'NameNormalized', 'HOO_Name', 'Agency Name', 'HeadOfOrganizationName', 'HeadOfOrganizationTitle', 'source']
+    
+    # First merge: Primary and OPS (outer join)
+    merged = pd.merge(
+        primary,
+        ops[ops_cols],
+        how='outer',
+        on='NameNormalized',
+        suffixes=('', '_ops'),
+        indicator='merge_ops'
+    )
+    
+    # For records only in OPS, copy OPS_Name to Name
+    ops_only_mask = merged['merge_ops'] == 'right_only'
+    merged.loc[ops_only_mask, 'Name'] = merged.loc[ops_only_mask, 'OPS_Name']
+    
+    logging.info(f"OPS merge stats:\n{merged['merge_ops'].value_counts()}")
+    logging.info(f"Columns after OPS merge: {merged.columns.tolist()}")
+    
+    # Second merge: Result with HOO (outer join)
+    merged = pd.merge(
+        merged,
+        hoo[hoo_cols],
+        how='outer',
+        on='NameNormalized',
+        suffixes=('', '_hoo'),
+        indicator='merge_hoo'
+    )
+    
+    # For records only in HOO, copy HOO_Name to Name
+    hoo_only_mask = merged['merge_hoo'] == 'right_only'
+    merged.loc[hoo_only_mask, 'Name'] = merged.loc[hoo_only_mask, 'HOO_Name']
+    
+    logging.info(f"HOO merge stats:\n{merged['merge_hoo'].value_counts()}")
+    logging.info(f"Columns after HOO merge: {merged.columns.tolist()}")
+    
+    # Track merge history
+    merged['merged_from'] = merged.apply(
+        lambda row: track_merge_history(row, 'RecordID', 'RecordID_ops', 'RecordID_hoo'),
+        axis=1
+    )
+    
+    # Clean up merge artifacts but preserve source-specific names
+    cols_to_drop = [col for col in merged.columns if col.endswith(('_ops', '_hoo')) 
+                   and col not in ['OPS_Name', 'HOO_Name']]
+    
+    # Log columns being dropped and preserved
+    logging.info(f"Columns being dropped: {cols_to_drop}")
+    logging.info(f"OPS_Name and HOO_Name present before cleanup: {['OPS_Name' in merged.columns, 'HOO_Name' in merged.columns]}")
+    
+    result = merged.drop(columns=cols_to_drop + ['merge_ops', 'merge_hoo'])
+    
+    # Log presence of columns and sample values before cleanup
+    logging.info(f"OPS_Name and HOO_Name present before cleanup: {['OPS_Name' in result.columns, 'HOO_Name' in result.columns]}")
+    logging.info(f"Sample HOO_Name values after merge: {result['HOO_Name'].head().tolist()}")
+    logging.info(f"Sample matched HOO_Name values: {result[result['HOO_Name'].notna()]['HOO_Name'].head().tolist()}")
+    
+    # Create Name - Ops and Name - HOO columns
+    result['Name - Ops'] = result['OPS_Name']
+    result['Name - HOO'] = result['HOO_Name']
+    
+    # Initialize data_source column if it doesn't exist
+    if 'data_source' not in result.columns:
+        result['data_source'] = None
+    
+    # Set data_source based on the actual source of data
+    def determine_source(row):
+        if pd.notna(row.get('Name - Ops')):
+            return 'ops'
+        elif pd.notna(row.get('Name - HOO')):
+            return 'hoo'
+        elif pd.notna(row.get('Name')):
+            return 'nyc_agencies_export'
+        return 'unknown'
+    
+    result['data_source'] = result.apply(determine_source, axis=1)
+    
+    # Remove rows where Name is NaN and no source-specific names exist
+    result = result[~(result['Name'].isna() & result['Name - Ops'].isna() & result['Name - HOO'].isna())]
+    
+    # Fill in Name where it's NaN but we have a source-specific name
+    name_fill_mask = result['Name'].isna()
+    result.loc[name_fill_mask & result['Name - Ops'].notna(), 'Name'] = result.loc[name_fill_mask & result['Name - Ops'].notna(), 'Name - Ops']
+    result.loc[name_fill_mask & result['Name - HOO'].notna(), 'Name'] = result.loc[name_fill_mask & result['Name - HOO'].notna(), 'Name - HOO']
+    
+    # Drop the original OPS_Name and HOO_Name columns as we now have Name - Ops and Name - HOO
+    result = result.drop(columns=['OPS_Name', 'HOO_Name'], errors='ignore')
+    
+    # Log presence of columns after cleanup
+    logging.info(f"OPS_Name and HOO_Name present after cleanup: {['OPS_Name' in result.columns, 'HOO_Name' in result.columns]}")
+    logging.info(f"Columns after cleanup: {result.columns.tolist()}")
+    
+    # Log source distribution
+    logging.info("\nRecord distribution by source:")
+    logging.info(result['source'].value_counts().to_string())
+    
+    return result
 
-    # Initialize merged_df with primary data
-    merged_df = primary_df.copy()
+def track_merge_history(row, primary_id_col, ops_id_col, hoo_id_col):
+    """Track which records were merged together."""
+    merged_ids = []
     
-    # If primary df doesn't have Agency Name, try to derive it from Name
-    if 'Agency Name' not in merged_df.columns and 'Name' in merged_df.columns:
-        merged_df['Agency Name'] = merged_df['Name']
+    if pd.notna(row.get(ops_id_col)):
+        merged_ids.append({"id": row[ops_id_col], "name": row.get('OPS_Name'), "score": None})
     
-    # Add source column to primary df
-    merged_df['source'] = 'primary'
+    if pd.notna(row.get(hoo_id_col)):
+        merged_ids.append({"id": row[hoo_id_col], "name": row.get('HOO_Name'), "score": None})
     
-    # Process each secondary dataframe
-    for df, additional_fields, source_prefix in secondary_dfs:
-        # Combine standard and additional fields
-        fields_to_keep = list(set(standard_fields + additional_fields))
-        
-        # Ensure all required fields exist
-        for field in fields_to_keep:
-            if field not in df.columns:
-                logging.warning(f"Field {field} not found in {source_prefix} dataset")
-                fields_to_keep.remove(field)
-        
-        df_to_merge = df[fields_to_keep].copy()
-        
-        # Add source column using the prefix
-        df_to_merge['source'] = source_prefix.rstrip('_')  # Remove trailing underscore if present
-        
-        # Concatenate with merged_df
-        merged_df = pd.concat([merged_df, df_to_merge], ignore_index=True)
-    
-    return merged_df
+    return merged_ids if merged_ids else None
 
-def clean_merged_data(df):
-    """Clean the merged dataset by handling missing values and removing invalid records.
+def clean_merged_data(df: pd.DataFrame) -> pd.DataFrame:
+    """Clean up merge artifacts and ensure consistent columns."""
     
-    Args:
-        df (pd.DataFrame): The merged DataFrame to clean
-        
-    Returns:
-        pd.DataFrame: The cleaned DataFrame
-    """
-    # Remove records with no identifying information
-    df = df.dropna(subset=['Name', 'Agency Name'], how='all')
+    # Remove duplicate ID columns but keep OPS_Name and HOO_Name
+    cols_to_drop = [col for col in df.columns if col.endswith(('_ops', '_hoo')) 
+                    and col not in ['OPS_Name', 'HOO_Name']]
     
-    # Handle URL conflicts
-    if 'HeadOfOrganizationURL' in df.columns and 'URL' in df.columns:
-        df['URL'] = df['URL'].fillna(df['HeadOfOrganizationURL'])
-        df = df.drop('HeadOfOrganizationURL', axis=1)
+    # Log columns being dropped and preserved
+    logging.info(f"Columns being dropped: {cols_to_drop}")
+    logging.info(f"OPS_Name and HOO_Name present before cleanup: {['OPS_Name' in df.columns, 'HOO_Name' in df.columns]}")
     
-    # Fill missing Agency Name from Name if available
-    df.loc[df['Agency Name'].isna(), 'Agency Name'] = df.loc[df['Agency Name'].isna(), 'Name']
+    result = df.drop(columns=cols_to_drop)
     
-    # Fill missing NameNormalized using normalizer
-    normalizer = NameNormalizer()
-    df.loc[df['NameNormalized'].isna(), 'NameNormalized'] = df.loc[df['NameNormalized'].isna(), 'Agency Name'].apply(normalizer.normalize)
+    # Log presence of columns after cleanup
+    logging.info(f"OPS_Name and HOO_Name present after cleanup: {['OPS_Name' in result.columns, 'HOO_Name' in result.columns]}")
     
-    return df
+    return result
 
 def track_data_provenance(df: pd.DataFrame) -> pd.DataFrame:
     """Enhanced data source tracking with improved logic"""
@@ -156,6 +241,11 @@ def deduplicate_merged_data(df: pd.DataFrame) -> pd.DataFrame:
     result_df['merge_note'] = None
     result_df['dedup_source'] = result_df['source']
     
+    # Ensure OPS_Name and HOO_Name columns exist
+    for col in ['OPS_Name', 'HOO_Name']:
+        if col not in result_df.columns:
+            result_df[col] = None
+    
     # Check for RecordID duplicates (should not happen)
     recordid_dupes = result_df[result_df['RecordID'].duplicated(keep=False)]
     if not recordid_dupes.empty:
@@ -195,9 +285,16 @@ def deduplicate_merged_data(df: pd.DataFrame) -> pd.DataFrame:
                 combined_record = keep_record.copy()
                 fields_preserved = []
                 
+                # Special handling for OPS_Name and HOO_Name
+                for col in ['OPS_Name', 'HOO_Name']:
+                    values = [r[col] for r in [keep_record] + [r for _, r in merge_records.iterrows()] if pd.notna(r.get(col))]
+                    if values:
+                        combined_record[col] = '|'.join(set(values))
+                        fields_preserved.append(col)
+                
                 # For each field in merge_records, fill in nulls in combined_record
                 for field in result_df.columns:
-                    if field not in ['RecordID', 'source', 'data_source', 'merged_from', 'merge_note', 'dedup_source']:
+                    if field not in ['RecordID', 'source', 'data_source', 'merged_from', 'merge_note', 'dedup_source', 'OPS_Name', 'HOO_Name']:
                         for _, merge_record in merge_records.iterrows():
                             if pd.isna(combined_record[field]) and pd.notna(merge_record[field]):
                                 combined_record[field] = merge_record[field]

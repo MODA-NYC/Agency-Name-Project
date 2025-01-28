@@ -5,6 +5,7 @@ import argparse
 from typing import List
 from preprocessing.ops_processor import OpsDataProcessor
 from preprocessing.hoo_processor import HooDataProcessor
+from preprocessing.data_normalization import standardize_name as full_standardize_name
 from matching.matcher import AgencyMatcher
 from analysis.quality_checker import DataQualityChecker
 from data_merging import merge_dataframes, clean_merged_data, track_data_provenance, ensure_record_ids
@@ -60,13 +61,12 @@ def main(data_dir: str, log_level: str, display: bool, save: bool):
         validate_dataframe_columns(nyc_agencies_export, ['Name'], 'nyc_agencies_export')
         logger.info(f"NYC agencies export records: {len(nyc_agencies_export)}")
         
+        # Normalize names in primary dataframe
+        nyc_agencies_export['NameNormalized'] = nyc_agencies_export['Name'].apply(full_standardize_name)
+        
         # Merge datasets
         logger.info("Merging datasets...")
-        secondary_dfs = [
-            (hoo_data, ['Agency Name','AgencyNameEnriched','NameNormalized','RecordID','HeadOfOrganizationName','HeadOfOrganizationTitle','HeadOfOrganizationURL'], 'nyc_gov_'),
-            (ops_data, ['Agency Name','AgencyNameEnriched','NameNormalized','RecordID','Entity type'], 'ops_')
-        ]
-        merged_df = merge_dataframes(nyc_agencies_export, secondary_dfs)
+        merged_df = merge_dataframes(nyc_agencies_export, ops_data, hoo_data)
         logger.info(f"Merged dataset row count (pre-clean): {len(merged_df)}")
         
         merged_df = clean_merged_data(merged_df)

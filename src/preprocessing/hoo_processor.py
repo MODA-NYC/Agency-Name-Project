@@ -1,6 +1,7 @@
 import pandas as pd
 from .base_processor import BaseDataProcessor
 from .data_normalization import standardize_name as full_standardize_name
+import logging
 
 class HooDataProcessor(BaseDataProcessor):
     """Processor for nyc_gov_hoo.csv with source-specific logic."""
@@ -27,9 +28,11 @@ class HooDataProcessor(BaseDataProcessor):
     def process(self, input_path: str) -> pd.DataFrame:
         """Complete processing pipeline for HOO data."""
         df = pd.read_csv(input_path)
+        logging.info(f"HOO data columns before processing: {df.columns.tolist()}")
 
         # Strip whitespace from column names
         df.columns = df.columns.str.strip()
+        logging.info(f"HOO data columns after stripping whitespace: {df.columns.tolist()}")
 
         # Check raw duplicates
         raw_dupes = self.check_raw_duplicates(df, ['Agency Name'])
@@ -42,6 +45,9 @@ class HooDataProcessor(BaseDataProcessor):
             if old_col in df.columns:
                 df[new_col] = df[old_col]
 
+        # Create normalized name directly from Agency Name
+        df['NameNormalized'] = df['Agency Name'].apply(full_standardize_name)
+        
         # Create AgencyNameEnriched by combining Agency Name and HoO Title if available
         if 'HeadOfOrganizationTitle' in df.columns and df['HeadOfOrganizationTitle'].notna().any():
             df['AgencyNameEnriched'] = df.apply(
@@ -51,12 +57,19 @@ class HooDataProcessor(BaseDataProcessor):
             )
         else:
             df['AgencyNameEnriched'] = df['Agency Name']
-
-        # Handle normalization duplicates - now use AgencyNameEnriched for normalization
-        df['NameNormalized'] = df['AgencyNameEnriched'].apply(full_standardize_name)
+        
+        # Preserve original name in HOO_Name column
+        df['HOO_Name'] = df['Agency Name']
+        
+        # Add source column
+        df['source'] = 'nyc_gov'
 
         # Add RecordID column if it doesn't exist
         if 'RecordID' not in df.columns:
             df['RecordID'] = df.index.map(lambda x: f'HOO_{x:06d}')
+        
+        logging.info(f"HOO data columns after processing: {df.columns.tolist()}")
+        logging.info(f"Sample HOO_Name values: {df['HOO_Name'].head().tolist()}")
+        logging.info(f"Sample normalized names: {df['NameNormalized'].head().tolist()}")
 
         return df

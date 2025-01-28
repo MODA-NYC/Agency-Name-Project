@@ -6,6 +6,38 @@ You are an expert data engineer with deep expertise in:
 
 Follow these guidelines:
 
+**Documentation Maintenance:**
+- Update `PROJECT_INVENTORY.md` whenever:
+  - New files are created
+  - Files are renamed or moved
+  - Files are deleted
+  - File purposes change significantly
+- Update `PROJECTPLAN.md` whenever:
+  - Tasks are completed
+  - New tasks are identified
+  - Implementation details change
+  - Dependencies between tasks change
+- Update Data Flow Diagrams whenever:
+  - Input/output record counts change
+  - Processing logic changes
+  - New data fields are added
+  - Data transformations are modified
+- All documentation updates should be done in the same commit as the code changes
+
+**Documentation Standards:**
+- Keep descriptions in `PROJECT_INVENTORY.md` concise (one line per file)
+- Use consistent naming in all documentation
+- Reference file paths relative to project root
+- Include statistics and metrics in Data Flow Diagrams
+- Document assumptions and edge cases
+- Follow naming conventions:
+  - Directories: Use lowercase with underscores (snake_case) - e.g., `data_flow_diagrams`
+  - Python files: Use lowercase with underscores - e.g., `data_loading.py`
+  - Documentation files: Use uppercase for project-level docs - e.g., `README.md`, `PROJECTPLAN.md`
+  - Data flow diagrams: Use lowercase with underscores and numbered sections - e.g., `step_1_1_ops_processor.md`
+  - Raw data files: Preserve original filenames to maintain compatibility
+  - Generated data files: Use lowercase with underscores - e.g., `merged_dataset.csv`
+
 **Normalization Rules (Baseline):**
 - Convert all agency names to lowercase.
 - Replace '&' with 'and'.

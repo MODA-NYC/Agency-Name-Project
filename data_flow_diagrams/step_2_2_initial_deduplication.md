@@ -1,17 +1,17 @@
-# Step 2.2 - Clean & Deduplicate
+# Step 2.2 - Initial Deduplication
 
 ## Entry Point (main.py)
 ```
 main.py
 ├── Load Merged Dataset
 │   └── Load merged_dataset.csv
-├── Run Deduplication
+├── Run Initial Deduplication
 │   └── Call deduplicate_merged_data()
 └── Save Results
     └── Save to dedup_merged_dataset.csv
 ```
 
-## Deduplication Flow (data_merging.py)
+## Initial Deduplication Flow (data_merging.py)
 ```
 deduplicate_merged_data()
 ├── Check for Exact Duplicates
@@ -21,7 +21,7 @@ deduplicate_merged_data()
 │       ├── Group by NameNormalized
 │       └── Log potential duplicates
 │
-├── Apply Deduplication Rules
+├── Apply Basic Deduplication Rules
 │   ├── Rule 1: Keep Primary Source
 │   │   └── If same name exists in multiple sources, prefer:
 │   │       1. nyc_agencies_export (primary)
@@ -31,7 +31,7 @@ deduplicate_merged_data()
 │   ├── Rule 2: Keep Most Information
 │   │   └── When merging duplicates:
 │   │       ├── Keep record with most non-null fields
-│   │       ├── Combine unique information from duplicates
+│   │       ├── Preserve source-specific names (Name - Ops, Name - HOO)
 │   │       └── Track merged records in 'merged_from' column
 │   │
 │   └── Rule 3: Special Cases
@@ -47,7 +47,7 @@ deduplicate_merged_data()
 │   │   └── Rules applied
 │   └── Save detailed log of merged records
 │
-└── Return Deduplicated DataFrame
+└── Return Initially Deduplicated DataFrame
     └── Include new columns:
         ├── dedup_source: Source of final record
         ├── merged_from: List of merged RecordIDs
@@ -56,13 +56,16 @@ deduplicate_merged_data()
 
 ## Data Flow
 ```
-Input (851 records)
+Input (658 records)
 └── merged_dataset.csv
     ├── Standard fields
     │   ├── RecordID
     │   ├── Agency Name
     │   ├── NameNormalized
     │   └── [Other fields...]
+    ├── Source-specific names
+    │   ├── Name - Ops
+    │   └── Name - HOO
     └── Source tracking
         ├── source
         └── data_source
@@ -70,6 +73,7 @@ Input (851 records)
 Output
 └── dedup_merged_dataset.csv
     ├── All original fields
+    ├── Preserved source-specific names
     ├── Deduplication metadata
     │   ├── dedup_source
     │   ├── merged_from
@@ -93,5 +97,8 @@ Output
 3. Validate source preferences were applied correctly
 4. Confirm special cases were handled properly
 5. Verify all merged records are properly documented
-6. Check that no critical information was lost during merging
-7. Validate deduplication audit trail is complete and accurate 
+6. Check that source-specific names (Name - Ops, Name - HOO) are preserved
+7. Validate deduplication audit trail is complete and accurate
+
+## Note
+This is an initial deduplication step that handles exact matches and known special cases. Further deduplication will occur in Step 3 using fuzzy matching techniques. 

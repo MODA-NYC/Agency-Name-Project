@@ -1,13 +1,13 @@
 # Step 3.2: Apply Verified Matches
 
 ## Overview
-This step uses manually verified matches from `consolidated_matches.csv` to perform a second round of deduplication on the dataset, preserving information from merged records and maintaining a detailed audit trail. The process includes both deterministic (ID-based) and fuzzy name matching strategies.
+This step uses manually verified matches from `consolidated_matches.csv` to perform a second round of deduplication on the dataset, preserving source-specific names and maintaining a detailed audit trail. The process includes both deterministic (ID-based) and fuzzy name matching strategies.
 
 ## Data Flow Diagram
 ```mermaid
 graph TD
     subgraph Input
-        A[dedup_merged_dataset.csv] --> B[Load Dataset]
+        A[merged_dataset.csv] --> B[Load Dataset]
         C[consolidated_matches.csv] --> D[Load Matches]
         D --> E[Filter Verified Matches]
     end
@@ -55,7 +55,7 @@ graph TD
 ## Components
 
 ### Input Files
-1. `dedup_merged_dataset.csv`
+1. `merged_dataset.csv`
    - Output from Step 2.2 (initial deduplication)
    - Contains records with standard fields and metadata
    - Includes source tracking and merge history
@@ -140,9 +140,9 @@ graph TD
    - Update provenance information
 
 ### Current Statistics (as of latest run)
-- Input Records: 790
-- Final Records: 378
-- Merged Records: 412
+- Input Records: 658
+- Final Records: 355
+- Merged Records: 303
 - Match Processing:
   - Total Matches: 823
   - Successfully Applied: 253
@@ -150,7 +150,9 @@ graph TD
     - By Fuzzy (>=0.85): 46
     - By Exact Name: 0
   - Records Not Found: 570
-- Records with Missing Metadata: 358
+- Source-Specific Names:
+  - Name - Ops preserved: 413
+  - Name - HOO preserved: 177
 
 ### Output Files
 
@@ -158,7 +160,9 @@ graph TD
    - Fully deduplicated records
    - All preserved information
    - Complete metadata columns
-   - Source-specific name fields
+   - Source-specific name fields:
+     - Name - Ops
+     - Name - HOO
    - Updated source tracking
 
 2. **verified_matches_summary.json**
@@ -188,7 +192,9 @@ graph TD
    - Validate source preferences were followed
 
 2. **Information Preservation**
-   - Source-specific names are preserved
+   - Source-specific names are preserved:
+     - Name - Ops maintained for OPS records
+     - Name - HOO maintained for HOO records
    - No critical data was lost
    - Field values were properly combined
    - Empty rows are properly handled

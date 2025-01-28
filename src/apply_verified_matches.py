@@ -3,9 +3,11 @@ import logging
 import json
 import os
 from pathlib import Path
-from typing import Dict, List, Tuple, Set
+from typing import Dict, List, Tuple, Set, Optional
 from difflib import SequenceMatcher
 import re
+import gc
+import numpy as np
 
 def setup_logging() -> logging.Logger:
     """Configure logging with appropriate format and level"""
@@ -16,463 +18,499 @@ def setup_logging() -> logging.Logger:
     return logging.getLogger(__name__)
 
 def load_and_validate_inputs() -> Tuple[pd.DataFrame, pd.DataFrame]:
-    """
-    Load and validate the deduplicated dataset and verified matches.
-    
-    Returns:
-        Tuple[pd.DataFrame, pd.DataFrame]: (deduplicated dataset, verified matches)
-    """
-    logger = logging.getLogger(__name__)
-    
+    """Load and validate input datasets"""
     try:
-        # Load deduplicated dataset
-        dedup_path = '../data/intermediate/dedup_merged_dataset.csv'
-        logger.info(f"Loading deduplicated dataset from {dedup_path}")
-        dedup_df = pd.read_csv(dedup_path)
+        dedup_path = Path('data/processed/final_deduplicated_dataset.csv')
+        matches_path = Path('data/processed/consolidated_matches.csv')
         
-        # Load consolidated matches
-        matches_path = '../data/processed/consolidated_matches.csv'
-        logger.info(f"Loading consolidated matches from {matches_path}")
+        if not dedup_path.exists() or not matches_path.exists():
+            raise FileNotFoundError("Required input files not found")
+            
+        df = pd.read_csv(dedup_path)
         matches_df = pd.read_csv(matches_path)
         
-        # Filter for verified matches
-        matches_df = matches_df[matches_df['Label'] == 'Match'].copy()
-        logger.info(f"Found {len(matches_df)} verified matches")
+        required_cols = {'RecordID', 'NameNormalized'}
+        match_cols = {'Source', 'Target', 'Score', 'Label'}
         
-        # Validate required fields
-        required_fields = ['RecordID', 'Agency Name', 'NameNormalized', 'source']
-        missing_fields = [f for f in required_fields if f not in dedup_df.columns]
-        if missing_fields:
-            raise ValueError(f"Missing required fields in dataset: {missing_fields}")
+        if not required_cols.issubset(df.columns):
+            raise ValueError(f"Missing required columns in deduplicated dataset: {required_cols - set(df.columns)}")
             
-        required_match_fields = ['Source', 'Target', 'Score', 'SourceID', 'TargetID']
-        missing_match_fields = [f for f in required_match_fields if f not in matches_df.columns]
-        if missing_match_fields:
-            raise ValueError(f"Missing required fields in matches: {missing_match_fields}")
+        if not match_cols.issubset(matches_df.columns):
+            raise ValueError(f"Missing required columns in matches file: {match_cols - set(matches_df.columns)}")
+            
+        return df, matches_df
         
-        return dedup_df, matches_df
-        
-    except FileNotFoundError as e:
-        logger.error(f"Could not find input file: {e}")
-        raise
     except Exception as e:
-        logger.error(f"Error loading inputs: {e}")
+        logging.error(f"Error loading inputs: {str(e)}")
         raise
 
-def merge_record_information(preferred_record: pd.Series, 
-                           secondary_record: pd.Series,
-                           metadata_fields: Set[str]) -> Tuple[pd.Series, List[str]]:
-    """
-    Merge information from two records, preserving non-null values from both.
-    Special handling for source-specific name fields to ensure original names are preserved.
+def initialize_metadata_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Initialize metadata columns if they don't exist"""
+    metadata_cols = ['merged_from', 'merge_note']
+    for col in metadata_cols:
+        if col not in df.columns:
+            df[col] = None
+    return df
+
+def safe_json_loads(json_str: str) -> List:
+    """Safely load JSON string, returning empty list if invalid"""
+    if pd.isna(json_str):
+        return []
+    try:
+        return json.loads(json_str)
+    except:
+        return []
+
+def update_metadata(record: pd.Series, merged_record: pd.Series, score: float) -> Tuple[str, str]:
+    """Update metadata for merged records"""
+    # Load existing merged_from list or initialize new one
+    merged_from = safe_json_loads(record.get('merged_from', '[]'))
     
-    Args:
-        preferred_record: The primary record to keep
-        secondary_record: The secondary record to merge information from
-        metadata_fields: Set of field names that are metadata (not to be merged)
-        
-    Returns:
-        Tuple[pd.Series, List[str]]: (merged record, list of preserved fields)
-    """
-    merged_record = preferred_record.copy()
-    fields_preserved = []
+    # Add the merged record to the history
+    merged_from.append({
+        'id': merged_record.get('RecordID', ''),
+        'name': merged_record.get('Name', ''),
+        'score': score
+    })
     
-    # Handle source-specific name fields first
-    # Map source fields to their corresponding name fields
-    source_name_mapping = {
-        'hoo': ['Name - HOO', 'Name_HOO'],
-        'ops': ['Name - Ops', 'Name_OPS']
+    # Build merge note
+    merge_note = f"Merged with {merged_record.get('RecordID', '')} (score: {score})"
+    
+    # Add any merge conflicts to the note
+    if 'merge_conflicts' in record and record['merge_conflicts']:
+        conflicts = '; '.join(record['merge_conflicts'])
+        merge_note += f"\nConflicts: {conflicts}"
+        del record['merge_conflicts']  # Clean up temporary field
+    
+    # Append to existing merge notes
+    if record.get('merge_note'):
+        merge_note = f"{record['merge_note']}\n{merge_note}"
+    
+    return json.dumps(merged_from), merge_note
+
+def build_record_map(df: pd.DataFrame) -> Dict[str, int]:
+    """Build a map of RecordID to DataFrame index"""
+    return {str(record_id): idx for idx, record_id in enumerate(df['RecordID']) if pd.notna(record_id)}
+
+def merge_record_information(preferred: pd.Series, secondary: pd.Series) -> pd.Series:
+    """Merge information from two records, preserving source-specific names"""
+    # Convert both Series to use the same index
+    preferred = preferred.copy()
+    secondary = secondary.copy()
+    all_columns = list(set(preferred.index) | set(secondary.index))
+    preferred = pd.Series(preferred.values, index=preferred.index).reindex(all_columns)
+    secondary = pd.Series(secondary.values, index=secondary.index).reindex(all_columns)
+    
+    merged = preferred.copy()
+    
+    # Define source-specific name fields
+    source_name_fields = {
+        'ops': ['Name - Ops'],
+        'hoo': ['Name - HOO'],
+        'primary': ['NameNormalized', 'Agency Name']
     }
     
-    # Ensure these fields exist in the merged record
-    for fields in source_name_mapping.values():
-        for field in fields:
-            if field not in merged_record:
-                merged_record[field] = None
+    # Preserve source-specific names
+    for source, name_fields in source_name_fields.items():
+        for field in name_fields:
+            if field in secondary.index and not pd.isna(secondary[field]):
+                if field not in merged.index or pd.isna(merged[field]):
+                    merged[field] = secondary[field]
+                elif merged[field] != secondary[field]:
+                    # If both records have different values, combine them
+                    merged[field] = f"{merged[field]}|{secondary[field]}"
     
-    # Preserve original names based on source
-    for record, source_type in [(preferred_record, preferred_record['source']), 
-                               (secondary_record, secondary_record['source'])]:
-        source_key = source_type.lower()
-        if 'hoo' in source_key:
-            source_key = 'hoo'
-        elif 'ops' in source_key:
-            source_key = 'ops'
-        
-        if source_key in source_name_mapping:
-            original_name = record.get('Name') or record.get('Agency Name')
-            if pd.notna(original_name):
-                for field in source_name_mapping[source_key]:
-                    merged_record[field] = original_name
-                    fields_preserved.append(field)
+    # Initialize merge conflicts list
+    merge_conflicts = []
     
-    # For each remaining field in secondary record
-    for field in secondary_record.index:
-        if (field not in [f for fields in source_name_mapping.values() for f in fields] and 
-            field not in metadata_fields):
-            if pd.isna(merged_record[field]) and pd.notna(secondary_record[field]):
-                merged_record[field] = secondary_record[field]
-                fields_preserved.append(field)
-                
-    return merged_record, fields_preserved
+    # Merge other non-null fields from secondary record
+    for col in secondary.index:
+        if col not in ['merged_from', 'merge_note']:  # Skip metadata fields
+            if pd.isna(merged[col]) and not pd.isna(secondary[col]):
+                merged[col] = secondary[col]
+            elif not pd.isna(merged[col]) and not pd.isna(secondary[col]) and merged[col] != secondary[col]:
+                # Record the conflict but keep the preferred record's value
+                merge_conflicts.append(f"{col}: preferred='{merged[col]}', secondary='{secondary[col]}'")
+    
+    # Add merge conflicts to the record if any exist
+    if merge_conflicts:
+        merged['merge_conflicts'] = merge_conflicts
+    
+    return merged
 
-def update_record_metadata(record: pd.Series,
-                         merged_from_record: pd.Series,
-                         fields_preserved: List[str]) -> pd.Series:
-    """
-    Update metadata for a merged record.
-    
-    Args:
-        record: The record to update
-        merged_from_record: The record being merged in
-        fields_preserved: List of fields preserved from merged record
-        
-    Returns:
-        pd.Series: Updated record with new metadata
-    """
-    # Update merged_from list
-    if pd.isna(record['merged_from']):
-        record['merged_from'] = [merged_from_record['RecordID']]
-    else:
-        # If it's a string representation of a list, eval it and append
-        current_merged = eval(record['merged_from'])
-        current_merged.append(merged_from_record['RecordID'])
-        record['merged_from'] = current_merged
-        
-    # Update merge note
-    fields_note = f" (preserved fields: {', '.join(fields_preserved)})" if fields_preserved else ""
-    new_note = f"Merged with {merged_from_record['RecordID']} from {merged_from_record['source']}{fields_note}"
-    
-    if pd.isna(record['merge_note']):
-        record['merge_note'] = new_note
-    else:
-        record['merge_note'] = f"{record['merge_note']}; {new_note}"
-        
-    return record
-
-def normalize_name_for_matching(name: str) -> List[str]:
-    """
-    Generate multiple normalized versions of a name for matching.
-    
-    Args:
-        name: Original name string
-        
-    Returns:
-        List[str]: List of normalized name variations
-    """
-    name = str(name).lower().strip()
-    
-    variations = {name}  # Use set to avoid duplicates
-    
-    # Basic normalization
-    basic = re.sub(r'[^\w\s]', ' ', name)
-    basic = re.sub(r'\s+', ' ', basic).strip()
-    variations.add(basic)
-    
-    # Common abbreviation expansions
-    abbrev_map = {
-        'dept': 'department',
-        'admin': 'administration',
-        'comm': 'commission',
-        'nyc': 'new york city',
-        'ny': 'new york',
-        'tech': 'technology',
-        'info': 'information',
-        'dev': 'development',
-        'svcs': 'services',
-        'mgmt': 'management'
-    }
-    
-    expanded = basic
-    for abbrev, full in abbrev_map.items():
-        expanded = re.sub(r'\b' + abbrev + r'\b', full, expanded)
-    variations.add(expanded)
-    
-    # Different word orders
-    words = basic.split()
-    if len(words) > 1:
-        # Move first word to end
-        variations.add(' '.join(words[1:] + [words[0]]))
-        # Move last word to front
-        variations.add(' '.join([words[-1]] + words[:-1]))
-    
-    return list(variations)
-
-def find_matching_record(name: str, df: pd.DataFrame, threshold: float = 0.85) -> pd.DataFrame:
-    """
-    Find matching records using multiple matching strategies.
-    
-    Args:
-        name: Name to match
-        df: DataFrame to search in
-        threshold: Minimum similarity score for fuzzy matching
-        
-    Returns:
-        pd.DataFrame: Matching records
-    """
-    # Try exact matches first
-    name_variations = normalize_name_for_matching(name)
-    for variation in name_variations:
-        matches = df[df['NameNormalized'].str.lower() == variation]
-        if not matches.empty:
-            return matches
-            
-    # If no exact matches, try fuzzy matching
-    best_score = 0
-    best_matches = pd.DataFrame()
-    
-    for _, row in df.iterrows():
-        max_score = 0
-        normalized = str(row['NameNormalized']).lower()
-        
-        # Try each variation against the normalized name
-        for variation in name_variations:
-            score = SequenceMatcher(None, variation, normalized).ratio()
-            max_score = max(max_score, score)
-        
-        if max_score >= threshold:
-            if max_score > best_score:
-                best_score = max_score
-                best_matches = pd.DataFrame([row])
-            elif max_score == best_score:
-                best_matches = pd.concat([best_matches, pd.DataFrame([row])])
-                
-    return best_matches
-
-def process_verified_matches(dedup_df: pd.DataFrame,
-                           matches_df: pd.DataFrame) -> Tuple[pd.DataFrame, Dict]:
-    """
-    Process verified matches and merge corresponding records.
-    
-    Args:
-        dedup_df: Deduplicated dataset
-        matches_df: Verified matches DataFrame
-        
-    Returns:
-        Tuple[pd.DataFrame, Dict]: (processed DataFrame, audit data)
-    """
-    logger = logging.getLogger(__name__)
-    result_df = dedup_df.copy()
-    
-    # Ensure source-specific name fields exist
-    source_name_fields = ['Name - HOO', 'Name - Ops', 'Name_HOO', 'Name_OPS']
-    for field in source_name_fields:
-        if field not in result_df.columns:
-            result_df[field] = None
-    
-    # Initialize audit data
-    audit_data = {
+def process_verified_matches(df: pd.DataFrame, matches_df: pd.DataFrame) -> Tuple[pd.DataFrame, Dict]:
+    """Process verified matches and merge records"""
+    stats = {
         'total_matches': len(matches_df),
         'matches_applied': 0,
         'records_affected': set(),
-        'fields_preserved': {},
-        'source_preferences_applied': 0,
-        'match_method': {
-            'by_id': 0,
-            'by_name': 0,
-            'by_fuzzy': 0
-        },
-        'skipped_matches': {
-            'missing_ids': 0,
-            'already_processed': 0,
-            'records_not_found': 0
-        }
+        'skipped_matches': 0,
+        'errors': 0,
+        'processed_ids': set(),
+        'original_records': len(df)
     }
     
-    # Track processed records to avoid reprocessing
-    processed_records = set()
-    
-    # Define metadata fields that shouldn't be merged
-    metadata_fields = {'RecordID', 'source', 'data_source', 'merged_from', 'merge_note', 'dedup_source'}
+    # Initialize metadata columns
+    df = initialize_metadata_columns(df)
     
     # Sort matches by score descending
     matches_df = matches_df.sort_values('Score', ascending=False)
     
-    # Process each match
-    for _, match in matches_df.iterrows():
-        source_records = pd.DataFrame()
-        target_records = pd.DataFrame()
+    # Process matches in batches
+    batch_size = 50
+    for start_idx in range(0, len(matches_df), batch_size):
+        batch_matches = matches_df.iloc[start_idx:start_idx + batch_size]
         
-        # Try ID matching first
-        if pd.notna(match['SourceID']) and pd.notna(match['TargetID']):
-            source_records = result_df[result_df['RecordID'] == match['SourceID']]
-            target_records = result_df[result_df['RecordID'] == match['TargetID']]
-            if not source_records.empty and not target_records.empty:
-                audit_data['match_method']['by_id'] += 1
+        # Track changes for this batch
+        indices_to_drop = []
+        batch_updates = []  # List of (index, record) tuples to update
+        batch_processed_ids = set()  # Track processed IDs for this batch
+        
+        # Build record map once for the batch
+        record_map = build_record_map(df)
+        
+        for _, match in batch_matches.iterrows():
+            try:
+                source_id = str(match['SourceID']) if pd.notna(match['SourceID']) else None
+                target_id = str(match['TargetID']) if pd.notna(match['TargetID']) else None
                 
-        # Try name matching if ID matching failed
-        if source_records.empty or target_records.empty:
-            source_records = find_matching_record(match['Source'], result_df)
-            target_records = find_matching_record(match['Target'], result_df)
-            
-            if not source_records.empty and not target_records.empty:
-                # Check if it was an exact match or fuzzy match
-                source_exact = any(str(match['Source']).lower() == str(r['NameNormalized']).lower() 
-                                 for _, r in source_records.iterrows())
-                target_exact = any(str(match['Target']).lower() == str(r['NameNormalized']).lower() 
-                                 for _, r in target_records.iterrows())
+                # Skip if either ID is missing
+                if not source_id or not target_id:
+                    logging.warning(f"Missing ID in match: {match['Source']} - {match['Target']}")
+                    stats['skipped_matches'] += 1
+                    continue
                 
-                if source_exact and target_exact:
-                    audit_data['match_method']['by_name'] += 1
+                # Skip self-referential matches
+                if source_id == target_id:
+                    logging.info(f"Skipping self-referential match: {source_id}")
+                    stats['skipped_matches'] += 1
+                    continue
+                
+                # Skip already processed ID pairs
+                id_pair = tuple(sorted([source_id, target_id]))
+                if id_pair in stats['processed_ids']:
+                    logging.info(f"Skipping already processed IDs: {source_id} - {target_id}")
+                    stats['skipped_matches'] += 1
+                    continue
+                
+                # Get record indices
+                source_idx = record_map.get(source_id)
+                target_idx = record_map.get(target_id)
+                
+                if source_idx is None or target_idx is None:
+                    logging.warning(f"Could not find records for match: {match['Source']} - {match['Target']}")
+                    stats['skipped_matches'] += 1
+                    continue
+                
+                # Get records
+                source_record = df.iloc[source_idx].copy()
+                target_record = df.iloc[target_idx].copy()
+                
+                # Determine which record to keep based on data completeness
+                source_completeness = source_record.notna().sum()
+                target_completeness = target_record.notna().sum()
+                
+                if source_completeness >= target_completeness:
+                    preferred = source_record
+                    secondary = target_record
+                    kept_idx = source_idx
+                    removed_idx = target_idx
                 else:
-                    audit_data['match_method']['by_fuzzy'] += 1
-            else:
-                audit_data['skipped_matches']['records_not_found'] += 1
-                logger.warning(f"Could not find records for match: {match['Source']} - {match['Target']}")
+                    preferred = target_record
+                    secondary = source_record
+                    kept_idx = target_idx
+                    removed_idx = source_idx
+                
+                # Merge records
+                merged_record = merge_record_information(preferred, secondary)
+                
+                # Update metadata
+                merged_from, merge_note = update_metadata(merged_record, secondary, match['Score'])
+                merged_record['merged_from'] = merged_from
+                merged_record['merge_note'] = merge_note
+                
+                # Queue updates
+                batch_updates.append((kept_idx, merged_record))
+                indices_to_drop.append(removed_idx)
+                batch_processed_ids.add(id_pair)
+                
+                logging.info(f"Processed match: {match['Source']} - {match['Target']}")
+                
+            except Exception as e:
+                logging.error(f"Error processing match {match['Source']} - {match['Target']}: {str(e)}")
+                stats['errors'] += 1
                 continue
         
-        source_record = source_records.iloc[0]
-        target_record = target_records.iloc[0]
+        # Apply all updates for this batch
+        for idx, record in batch_updates:
+            for col in record.index:
+                if col in df.columns:
+                    df.loc[idx, col] = record[col]
         
-        # Skip if either record was already processed
-        if source_record['RecordID'] in processed_records or target_record['RecordID'] in processed_records:
-            audit_data['skipped_matches']['already_processed'] += 1
-            continue
-            
-        # Determine which record to keep based on source preference
-        source_order = ['nyc_agencies_export', 'ops', 'nyc_gov']
-        source_ranks = {source: rank for rank, source in enumerate(source_order)}
+        # Drop removed indices and reset index
+        if indices_to_drop:
+            df = df.drop(index=indices_to_drop)
+            df = df.reset_index(drop=True)
         
-        source_rank = source_ranks.get(source_record['source'], len(source_order))
-        target_rank = source_ranks.get(target_record['source'], len(source_order))
+        # Update statistics
+        stats['matches_applied'] += len(batch_updates)
+        stats['processed_ids'].update(batch_processed_ids)
+        stats['records_affected'].update(id for pair in batch_processed_ids for id in pair)
         
-        if source_rank <= target_rank:
-            keep_record = source_record
-            merge_record = target_record
-        else:
-            keep_record = target_record
-            merge_record = source_record
-            
-        # Merge information and update metadata
-        merged_record, fields_preserved = merge_record_information(
-            keep_record, merge_record, metadata_fields
-        )
-        
-        merged_record = update_record_metadata(
-            merged_record, merge_record, fields_preserved
-        )
-        
-        # Update the result DataFrame
-        merged_dict = {field: merged_record[field] for field in result_df.columns if field in merged_record}
-        result_df.loc[result_df['RecordID'] == merged_record['RecordID'], merged_dict.keys()] = pd.Series(merged_dict)
-        # Remove the merged record and clean up empty rows
-        result_df = result_df[result_df['RecordID'] != merge_record['RecordID']].dropna(how='all')
-        
-        # Update audit data
-        audit_data['matches_applied'] += 1
-        audit_data['records_affected'].add(merged_record['RecordID'])
-        audit_data['source_preferences_applied'] += 1
-        
-        for field in fields_preserved:
-            audit_data['fields_preserved'][field] = audit_data['fields_preserved'].get(field, 0) + 1
-            
-        # Mark records as processed
-        processed_records.add(merged_record['RecordID'])
-        processed_records.add(merge_record['RecordID'])
-        
-        logger.info(f"Processed match: {match['Source']} - {match['Target']}")
-        
-    # Convert sets to lists for JSON serialization
-    audit_data['records_affected'] = list(audit_data['records_affected'])
+        # Force garbage collection after each batch
+        gc.collect()
     
-    # Log summary
-    logger.info("\nMatch Processing Summary:")
-    logger.info(f"Total matches: {audit_data['total_matches']}")
-    logger.info(f"Matches applied: {audit_data['matches_applied']}")
-    logger.info(f"Records affected: {len(audit_data['records_affected'])}")
-    logger.info("\nMatch methods:")
-    logger.info(f"- By ID: {audit_data['match_method']['by_id']}")
-    logger.info(f"- By name: {audit_data['match_method']['by_name']}")
-    logger.info(f"- By fuzzy: {audit_data['match_method']['by_fuzzy']}")
-    logger.info("\nSkipped matches:")
-    for reason, count in audit_data['skipped_matches'].items():
-        logger.info(f"- {reason}: {count}")
+    # Convert processed_ids to list for JSON serialization
+    stats['processed_ids'] = list(stats['processed_ids'])
+    stats['records_affected'] = len(stats['records_affected'])
+    stats['final_records'] = len(df)
+    stats['records_merged'] = stats['original_records'] - stats['final_records']
     
-    return result_df, audit_data
+    return df, stats
 
 def save_outputs(final_df: pd.DataFrame, audit_data: Dict) -> None:
-    """
-    Save the final dataset and audit information.
-    
-    Args:
-        final_df: The final deduplicated DataFrame
-        audit_data: Dictionary containing audit information
-    """
-    logger = logging.getLogger(__name__)
-    
+    """Save the final dataset and audit information"""
     try:
         # Create output directories if they don't exist
-        os.makedirs('../data/processed', exist_ok=True)
-        os.makedirs('../data/analysis', exist_ok=True)
-        
-        # Ensure source-specific name fields are present
-        source_name_fields = ['Name - HOO', 'Name - Ops', 'Name_HOO', 'Name_OPS']
-        for field in source_name_fields:
-            if field not in final_df.columns:
-                final_df[field] = None
-        
-        # Clean up empty rows but preserve source name fields
-        non_empty_mask = ~final_df.drop(columns=source_name_fields).isna().all(axis=1)
-        final_df = final_df[non_empty_mask]
+        Path('data/processed').mkdir(parents=True, exist_ok=True)
+        Path('data/analysis').mkdir(parents=True, exist_ok=True)
         
         # Save final dataset
-        output_path = '../data/processed/final_deduplicated_dataset.csv'
+        output_path = Path('data/processed/final_deduplicated_dataset.csv')
         final_df.to_csv(output_path, index=False)
-        logger.info(f"Saved final dataset to {output_path}")
+        logging.info(f"Saved final dataset to {output_path}")
         
         # Save audit summary
-        summary_path = '../data/analysis/verified_matches_summary.json'
-        with open(summary_path, 'w') as f:
+        audit_path = Path('data/analysis/verified_matches_summary.json')
+        with open(audit_path, 'w') as f:
             json.dump(audit_data, f, indent=2)
-        logger.info(f"Saved audit summary to {summary_path}")
+        logging.info(f"Saved audit summary to {audit_path}")
         
     except Exception as e:
-        logger.error(f"Error saving outputs: {e}")
+        logging.error(f"Error saving outputs: {str(e)}")
         raise
 
-def validate_results(final_df: pd.DataFrame, 
-                    original_df: pd.DataFrame,
-                    matches_df: pd.DataFrame) -> None:
-    """
-    Validate the results of the matching process.
+def validate_results(df: pd.DataFrame, matches_df: pd.DataFrame, processed_ids: Set[Tuple[str, str]], stats: Dict):
+    """Validate the results of match processing"""
+    validation_stats = {
+        'total_matches': len(matches_df),
+        'properly_processed': 0,
+        'skipped_self_referential': 0,
+        'skipped_missing_ids': 0,
+        'skipped_already_processed': 0,
+        'not_properly_processed': 0,
+        'records_not_found': 0,
+        'validation_errors': []
+    }
     
-    Args:
-        final_df: The final deduplicated DataFrame
-        original_df: The original deduplicated DataFrame
-        matches_df: The verified matches DataFrame
-    """
-    logger = logging.getLogger(__name__)
+    # Get set of valid record IDs
+    valid_record_ids = set(df['RecordID'].dropna().astype(str))
     
-    # Check all verified matches were processed
     for _, match in matches_df.iterrows():
-        # At least one of the records should exist in final dataset
-        if not (
-            (final_df['RecordID'] == match['SourceID']).any() or
-            (final_df['RecordID'] == match['TargetID']).any()
-        ):
-            logger.warning(f"Match not properly processed: {match['SourceID']} - {match['TargetID']}")
-    
-    # Check for remaining duplicates
-    name_dupes = final_df[final_df['NameNormalized'].duplicated(keep=False)]
-    if not name_dupes.empty:
-        logger.warning(f"Found {len(name_dupes)} records with duplicate normalized names")
+        source_id = str(match['SourceID'])
+        target_id = str(match['TargetID'])
         
-    # Verify no critical information was lost
-    original_records = set(original_df['RecordID'])
-    final_records = set(final_df['RecordID'])
-    merged_records = original_records - final_records
+        # Skip if either ID is missing
+        if pd.isna(source_id) or pd.isna(target_id):
+            validation_stats['skipped_missing_ids'] += 1
+            continue
+            
+        # Skip self-referential matches
+        if source_id == target_id:
+            validation_stats['skipped_self_referential'] += 1
+            continue
+            
+        id_pair = tuple(sorted([source_id, target_id]))
+        
+        # Check if match was processed
+        if id_pair in processed_ids:
+            validation_stats['properly_processed'] += 1
+            continue
+            
+        # Check if records exist in dataset
+        if source_id not in valid_record_ids or target_id not in valid_record_ids:
+            validation_stats['records_not_found'] += 1
+            validation_stats['validation_errors'].append(
+                f"Records not found for match: {match['Source']} - {match['Target']} "
+                f"(IDs: {source_id} - {target_id})"
+            )
+            continue
+            
+        # If we get here, the match should have been processed but wasn't
+        validation_stats['not_properly_processed'] += 1
+        validation_stats['validation_errors'].append(
+            f"Match not properly processed: {source_id} - {target_id}"
+        )
     
-    logger.info(f"Original records: {len(original_records)}")
-    logger.info(f"Final records: {len(final_records)}")
-    logger.info(f"Merged records: {len(merged_records)}")
+    # Log validation summary
+    logging.info("\nValidation Summary:")
+    logging.info(f"Total matches: {validation_stats['total_matches']}")
+    logging.info(f"Properly processed: {validation_stats['properly_processed']}")
+    logging.info(f"Skipped (self-referential): {validation_stats['skipped_self_referential']}")
+    logging.info(f"Skipped (missing IDs): {validation_stats['skipped_missing_ids']}")
+    logging.info(f"Skipped (already processed): {validation_stats['skipped_already_processed']}")
+    logging.info(f"Records not found: {validation_stats['records_not_found']}")
+    logging.info(f"Not properly processed: {validation_stats['not_properly_processed']}")
     
-    # Check metadata integrity
-    missing_metadata = final_df[
-        pd.isna(final_df['merged_from']) & 
-        pd.isna(final_df['merge_note'])
+    if validation_stats['validation_errors']:
+        logging.warning("\nValidation Errors:")
+        for error in validation_stats['validation_errors'][:10]:  # Show first 10 errors
+            logging.warning(error)
+        if len(validation_stats['validation_errors']) > 10:
+            logging.warning(f"...and {len(validation_stats['validation_errors']) - 10} more errors")
+    
+    stats['validation'] = validation_stats
+    return validation_stats
+
+def normalize_name(name: str) -> str:
+    """Apply consistent normalization rules to agency names."""
+    if pd.isna(name):
+        return ""
+    
+    name = name.lower()
+    
+    # Common substitutions
+    name = name.replace('&', 'and')
+    name = name.replace('nyc', 'new york city')
+    name = name.replace('ny', 'new york')
+    
+    # Remove parentheses and their contents
+    name = re.sub(r'\([^)]*\)', '', name)
+    
+    # Remove punctuation except hyphens
+    name = re.sub(r'[^\w\s-]', ' ', name)
+    
+    # Remove extra whitespace
+    name = ' '.join(name.split())
+    
+    # Standardize organizational terms
+    org_terms = {
+        'dept': 'department',
+        'comm': 'commission',
+        'auth': 'authority',
+        'admin': 'administration',
+        'corp': 'corporation',
+        'dev': 'development',
+        'svcs': 'services',
+        'svc': 'service',
+        'tech': 'technology',
+        'mgmt': 'management',
+        'ops': 'operations',
+        'bd': 'board',
+        'div': 'division',
+        'inst': 'institute',
+        'org': 'organization',
+        'ofc': 'office',
+        'ctr': 'center',
+        'sys': 'system',
+        'dist': 'district',
+        'coord': 'coordinator',
+        'coord': 'coordination'
+    }
+    
+    words = name.split()
+    normalized_words = [org_terms.get(word, word) for word in words]
+    name = ' '.join(normalized_words)
+    
+    # Standardize common patterns
+    patterns = [
+        (r'department\s+of\s+(\w+)', r'\1 department'),  # "department of X" -> "X department"
+        (r'office\s+of\s+(\w+)', r'\1 office'),  # "office of X" -> "X office"
+        (r'commission\s+on\s+(\w+)', r'\1 commission'),  # "commission on X" -> "X commission"
+        (r"mayor'?s?\s+office\s+of\s+(\w+)", r'\1 office'),  # "mayor's office of X" -> "X office"
+        (r'board\s+of\s+(\w+)', r'\1 board'),  # "board of X" -> "X board"
+        (r'division\s+of\s+(\w+)', r'\1 division'),  # "division of X" -> "X division"
+        (r'bureau\s+of\s+(\w+)', r'\1 bureau'),  # "bureau of X" -> "X bureau"
+        (r'center\s+for\s+(\w+)', r'\1 center'),  # "center for X" -> "X center"
+        (r'system\s+of\s+(\w+)', r'\1 system'),  # "system of X" -> "X system"
+        (r'district\s+of\s+(\w+)', r'\1 district'),  # "district of X" -> "X district"
+        (r'coordinator\s+of\s+(\w+)', r'\1 coordinator'),  # "coordinator of X" -> "X coordinator"
+        (r'coordination\s+of\s+(\w+)', r'\1 coordination')  # "coordination of X" -> "X coordination"
     ]
-    if not missing_metadata.empty:
-        logger.warning(f"Found {len(missing_metadata)} records with missing metadata")
+    
+    for pattern, replacement in patterns:
+        name = re.sub(pattern, replacement, name)
+    
+    return name.strip()
+
+def generate_name_variations(name: str) -> set:
+    """Generate common variations of an agency name."""
+    variations = {name}
+    
+    # Add version with 'office of' prefix
+    variations.add(f"office of {name}")
+    variations.add(f"mayors office of {name}")
+    variations.add(f"office of the {name}")
+    variations.add(f"the {name}")
+    
+    # Add version with 'department of' prefix
+    variations.add(f"department of {name}")
+    
+    # Handle reversals (e.g., "education department" <-> "department of education")
+    if ' ' in name:
+        words = name.split()
+        variations.add(f"{words[-1]} {' '.join(words[:-1])}")
+        
+        # Handle cases with articles
+        if words[0] == 'the':
+            variations.add(f"{' '.join(words[1:])}")
+        else:
+            variations.add(f"the {name}")
+            
+        # Handle hyphenation variations
+        if '-' in name:
+            variations.add(name.replace('-', ' '))
+        else:
+            for i in range(len(words) - 1):
+                hyphenated = words.copy()
+                hyphenated[i] = f"{hyphenated[i]}-{hyphenated[i+1]}"
+                del hyphenated[i+1]
+                variations.add(' '.join(hyphenated))
+    
+    return variations
+
+def find_record_by_name(name: str, df: pd.DataFrame, record_map: Dict[str, int]) -> Optional[str]:
+    """Find a record ID by trying various name variations."""
+    # Try exact match first
+    normalized_name = normalize_name(name)
+    
+    # Check both Name and NameNormalized columns
+    for idx, row in df.iterrows():
+        if pd.notna(row.get('Name')):
+            if normalize_name(row['Name']) == normalized_name:
+                return row['RecordID']
+        if pd.notna(row.get('NameNormalized')):
+            if row['NameNormalized'] == normalized_name:
+                return row['RecordID']
+    
+    # Try variations
+    variations = generate_name_variations(normalized_name)
+    for variation in variations:
+        for idx, row in df.iterrows():
+            if pd.notna(row.get('Name')):
+                if normalize_name(row['Name']) == variation:
+                    return row['RecordID']
+            if pd.notna(row.get('NameNormalized')):
+                if row['NameNormalized'] == variation:
+                    return row['RecordID']
+    
+    # Try fuzzy matching as a last resort
+    best_match = None
+    best_score = 0
+    
+    for idx, row in df.iterrows():
+        if pd.notna(row.get('Name')):
+            score = SequenceMatcher(None, normalize_name(row['Name']), normalized_name).ratio()
+            if score > best_score and score > 0.95:  # Only consider very close matches
+                best_score = score
+                best_match = row['RecordID']
+        if pd.notna(row.get('NameNormalized')):
+            score = SequenceMatcher(None, row['NameNormalized'], normalized_name).ratio()
+            if score > best_score and score > 0.95:
+                best_score = score
+                best_match = row['RecordID']
+    
+    return best_match
 
 def main():
     """Main function to execute Step 3.2"""
@@ -483,22 +521,29 @@ def main():
         logger.info("Loading and validating inputs...")
         dedup_df, matches_df = load_and_validate_inputs()
         
+        # Initialize metadata columns
+        dedup_df = initialize_metadata_columns(dedup_df)
+        
         # Process verified matches
         logger.info("Processing verified matches...")
-        final_df, audit_data = process_verified_matches(dedup_df, matches_df)
+        final_df, stats = process_verified_matches(dedup_df, matches_df)
         
-        # Save outputs
-        logger.info("Saving outputs...")
-        save_outputs(final_df, audit_data)
+        # Convert processed_ids to set for validation
+        processed_ids = set(tuple(pair) for pair in stats['processed_ids'])
         
         # Validate results
         logger.info("Validating results...")
-        validate_results(final_df, dedup_df, matches_df)
+        validation_stats = validate_results(final_df, matches_df, processed_ids, stats)
+        stats['validation'] = validation_stats
+        
+        # Save outputs
+        logger.info("Saving outputs...")
+        save_outputs(final_df, stats)
         
         logger.info("Step 3.2 completed successfully")
         
     except Exception as e:
-        logger.error(f"Error in Step 3.2: {e}")
+        logger.error(f"Error in Step 3.2: {str(e)}")
         raise
 
 if __name__ == "__main__":

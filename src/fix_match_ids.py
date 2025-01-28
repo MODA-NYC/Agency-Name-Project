@@ -4,16 +4,18 @@ from pathlib import Path
 import re
 from difflib import SequenceMatcher
 
+# Set up logging
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
+logger = logging.getLogger(__name__)
 
 def load_dedup_dataset():
     """Load the deduplicated dataset."""
-    df = pd.read_csv("../data/processed/final_deduplicated_dataset.csv")
+    df = pd.read_csv("data/intermediate/dedup_merged_dataset.csv")
     return df
 
 def load_matches():
     """Load the consolidated matches file."""
-    df = pd.read_csv("../data/processed/consolidated_matches.csv")
+    df = pd.read_csv("data/processed/consolidated_matches.csv")
     return df
 
 def normalize_name(name):
@@ -28,22 +30,63 @@ def normalize_name(name):
     name = name.replace('nyc', 'new york city')
     name = name.replace('ny', 'new york')
     
+    # Remove parentheses and their contents
+    name = re.sub(r'\([^)]*\)', '', name)
+    
     # Remove punctuation except hyphens
     name = re.sub(r'[^\w\s-]', ' ', name)
     
     # Remove extra whitespace
     name = ' '.join(name.split())
     
-    # Remove common words if they appear at start/end
-    prefixes = ['the ', 'office of ', 'office for ', 'department of ', 'mayors office of ', 'nyc ']
-    for prefix in prefixes:
-        if name.startswith(prefix):
-            name = name[len(prefix):]
-            
-    suffixes = [' office', ' department', ' commission', ' committee', ' board', ' authority']
-    for suffix in suffixes:
-        if name.endswith(suffix):
-            name = name[:-len(suffix)]
+    # Standardize organizational terms
+    org_terms = {
+        'dept': 'department',
+        'comm': 'commission',
+        'auth': 'authority',
+        'admin': 'administration',
+        'corp': 'corporation',
+        'dev': 'development',
+        'svcs': 'services',
+        'svc': 'service',
+        'tech': 'technology',
+        'mgmt': 'management',
+        'ops': 'operations',
+        'bd': 'board',
+        'div': 'division',
+        'inst': 'institute',
+        'org': 'organization',
+        'ofc': 'office',
+        'ctr': 'center',
+        'sys': 'system',
+        'dist': 'district',
+        'coord': 'coordinator',
+        'coord': 'coordination',
+        'cncl': 'council',
+        'cmte': 'committee',
+        'assoc': 'association',
+        'fdn': 'foundation'
+    }
+    
+    words = name.split()
+    normalized_words = [org_terms.get(word, word) for word in words]
+    name = ' '.join(normalized_words)
+    
+    # Standardize common patterns
+    patterns = [
+        (r'department\s+of\s+(\w+)', r'\1 department'),  # "department of X" -> "X department"
+        (r'office\s+of\s+(\w+)', r'\1 office'),  # "office of X" -> "X office"
+        (r'commission\s+on\s+(\w+)', r'\1 commission'),  # "commission on X" -> "X commission"
+        (r'board\s+of\s+(\w+)', r'\1 board'),  # "board of X" -> "X board"
+        (r'division\s+of\s+(\w+)', r'\1 division'),  # "division of X" -> "X division"
+        (r'center\s+for\s+(\w+)', r'\1 center'),  # "center for X" -> "X center"
+        (r'system\s+of\s+(\w+)', r'\1 system'),  # "system of X" -> "X system"
+        (r'committee\s+on\s+(\w+)', r'\1 committee'),  # "committee on X" -> "X committee"
+        (r'authority\s+for\s+(\w+)', r'\1 authority'),  # "authority for X" -> "X authority"
+    ]
+    
+    for pattern, replacement in patterns:
+        name = re.sub(pattern, replacement, name)
     
     return name.strip()
 
@@ -54,14 +97,32 @@ def generate_name_variations(name):
     # Add version with 'office of' prefix
     variations.add(f"office of {name}")
     variations.add(f"mayors office of {name}")
+    variations.add(f"office of the {name}")
     
     # Add version with 'department of' prefix
     variations.add(f"department of {name}")
     
+    # Add version with 'the' prefix and without
+    variations.add(f"the {name}")
+    variations.add(name.replace("the ", ""))
+    
+    # Handle hyphenated names
+    if '-' in name:
+        variations.add(name.replace('-', ' '))
+        variations.add(name.replace('-', ' and '))
+    
     # Handle reversals (e.g., "education department" <-> "department of education")
     if ' ' in name:
         words = name.split()
-        variations.add(f"{words[-1]} {' '.join(words[:-1])}")
+        # Try reversing with organizational terms
+        org_terms = ['department', 'office', 'commission', 'board', 'division', 'center', 'system', 'committee', 'authority']
+        for term in org_terms:
+            if term in words:
+                idx = words.index(term)
+                before = ' '.join(words[:idx])
+                after = ' '.join(words[idx+1:])
+                variations.add(f"{term} of {before} {after}".strip())
+                variations.add(f"{before} {after} {term}".strip())
     
     return variations
 
@@ -105,9 +166,14 @@ def fix_match_ids(matches_df, name_to_id):
     missing_count = {'source': 0, 'target': 0}
     fuzzy_threshold = 0.85  # Minimum similarity score for fuzzy matches
     
-    for idx, row in matches_df.iterrows():
-        # Only process rows marked as Match
-        if row['Label'] != 'Match':
+    # Only process verified matches
+    verified_matches = matches_df[matches_df['Label'] == 'Match'].copy()
+    logger.info(f"Processing {len(verified_matches)} verified matches")
+    
+    for idx, row in verified_matches.iterrows():
+        # Skip if both IDs are null (legacy match)
+        if pd.isna(row['SourceID']) and pd.isna(row['TargetID']):
+            logger.debug(f"Skipping legacy match: {row['Source']} - {row['Target']}")
             continue
             
         # Try to fix Source ID if missing
@@ -118,6 +184,7 @@ def fix_match_ids(matches_df, name_to_id):
             if source_name in name_to_id:
                 matches_df.at[idx, 'SourceID'] = name_to_id[source_name]
                 updated_count['source'] += 1
+                logger.info(f"Fixed SourceID for: {row['Source']} -> {name_to_id[source_name]}")
             else:
                 # Try variations
                 found_match = False
@@ -125,6 +192,7 @@ def fix_match_ids(matches_df, name_to_id):
                     if variation in name_to_id:
                         matches_df.at[idx, 'SourceID'] = name_to_id[variation]
                         updated_count['source'] += 1
+                        logger.info(f"Fixed SourceID using variation: {row['Source']} -> {name_to_id[variation]}")
                         found_match = True
                         break
                 
@@ -141,10 +209,10 @@ def fix_match_ids(matches_df, name_to_id):
                     if best_match:
                         matches_df.at[idx, 'SourceID'] = name_to_id[best_match]
                         updated_count['source'] += 1
-                        logging.info(f"Fuzzy matched source: '{row['Source']}' -> '{best_match}' (score: {best_score:.2f})")
+                        logger.info(f"Fixed SourceID using fuzzy match: '{row['Source']}' -> '{best_match}' (score: {best_score:.2f})")
                     else:
                         missing_count['source'] += 1
-                        logging.warning(f"Could not find ID for source: {row['Source']}")
+                        logger.debug(f"Could not find ID for source: {row['Source']}")
                 
         # Try to fix Target ID if missing
         if pd.isna(row['TargetID']):
@@ -154,6 +222,7 @@ def fix_match_ids(matches_df, name_to_id):
             if target_name in name_to_id:
                 matches_df.at[idx, 'TargetID'] = name_to_id[target_name]
                 updated_count['target'] += 1
+                logger.info(f"Fixed TargetID for: {row['Target']} -> {name_to_id[target_name]}")
             else:
                 # Try variations
                 found_match = False
@@ -161,6 +230,7 @@ def fix_match_ids(matches_df, name_to_id):
                     if variation in name_to_id:
                         matches_df.at[idx, 'TargetID'] = name_to_id[variation]
                         updated_count['target'] += 1
+                        logger.info(f"Fixed TargetID using variation: {row['Target']} -> {name_to_id[variation]}")
                         found_match = True
                         break
                 
@@ -177,13 +247,13 @@ def fix_match_ids(matches_df, name_to_id):
                     if best_match:
                         matches_df.at[idx, 'TargetID'] = name_to_id[best_match]
                         updated_count['target'] += 1
-                        logging.info(f"Fuzzy matched target: '{row['Target']}' -> '{best_match}' (score: {best_score:.2f})")
+                        logger.info(f"Fixed TargetID using fuzzy match: '{row['Target']}' -> '{best_match}' (score: {best_score:.2f})")
                     else:
                         missing_count['target'] += 1
-                        logging.warning(f"Could not find ID for target: {row['Target']}")
+                        logger.debug(f"Could not find ID for target: {row['Target']}")
     
-    logging.info(f"Updated {updated_count['source']} source IDs and {updated_count['target']} target IDs")
-    logging.info(f"Still missing {missing_count['source']} source IDs and {missing_count['target']} target IDs")
+    logger.info(f"Updated {updated_count['source']} source IDs and {updated_count['target']} target IDs")
+    logger.info(f"Still missing {missing_count['source']} source IDs and {missing_count['target']} target IDs")
     
     return matches_df
 
@@ -199,7 +269,7 @@ def main():
     updated_matches = fix_match_ids(matches_df, name_to_id)
     
     # Save updated matches
-    updated_matches.to_csv("../data/processed/consolidated_matches.csv", index=False)
+    updated_matches.to_csv("data/processed/consolidated_matches.csv", index=False)
     logging.info("Saved updated matches file")
 
 if __name__ == "__main__":

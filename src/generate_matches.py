@@ -1,9 +1,10 @@
 import pandas as pd
 import logging
 from pathlib import Path
-from matching.enhanced_matching import EnhancedMatcher
+from typing import List, Dict, Set, Tuple
+from src.matching.enhanced_matching import EnhancedMatcher
 
-def setup_logging():
+def setup_logging() -> logging.Logger:
     """Configure logging with appropriate format and level"""
     logging.basicConfig(
         level=logging.INFO,
@@ -11,120 +12,172 @@ def setup_logging():
     )
     return logging.getLogger(__name__)
 
-def load_dedup_dataset():
-    """Load the deduplicated dataset"""
+def load_merged_dataset() -> pd.DataFrame:
+    """Load the merged dataset with proper encoding"""
     try:
-        df = pd.read_csv('../data/intermediate/dedup_merged_dataset.csv')
+        df = pd.read_csv('data/processed/final_deduplicated_dataset.csv', encoding='utf-8')
+        required_cols = {'RecordID', 'Agency Name', 'NameNormalized'}
+        
+        if not required_cols.issubset(df.columns):
+            missing = required_cols - set(df.columns)
+            raise ValueError(f"Missing required columns: {missing}")
+            
         return df
-    except FileNotFoundError as e:
-        raise FileNotFoundError(f"Could not find deduplicated dataset: {e}")
+        
+    except Exception as e:
+        logging.error(f"Error loading merged dataset: {e}")
+        raise
 
-def load_existing_matches():
-    """Load existing matches to avoid duplicates"""
-    try:
-        matches_df = pd.read_csv('../data/processed/consolidated_matches.csv')
-        return matches_df
-    except FileNotFoundError:
-        # If file doesn't exist, return empty DataFrame with required columns
-        return pd.DataFrame(columns=['Source', 'Target', 'Score', 'Label', 'SourceID', 'TargetID'])
-
-def get_existing_pairs(matches_df):
-    """Get set of existing source-target pairs to avoid duplicates"""
-    pairs = set()
-    for _, row in matches_df.iterrows():
-        # Add both directions to avoid duplicates
-        pairs.add((str(row['Source']).lower(), str(row['Target']).lower()))
-        pairs.add((str(row['Target']).lower(), str(row['Source']).lower()))
-    return pairs
-
-def generate_potential_matches(df, existing_pairs, matcher, logger):
-    """Generate potential matches using EnhancedMatcher"""
-    new_matches = []
-    total_comparisons = 0
+def generate_potential_matches(
+    df: pd.DataFrame,
+    existing_pairs: Set[Tuple[str, str]],
+    matcher: EnhancedMatcher,
+    logger: logging.Logger
+) -> List[Dict]:
+    """
+    Generate potential matches using enhanced matching logic.
+    
+    Args:
+        df: DataFrame containing agency records
+        existing_pairs: Set of existing matches to avoid duplicates
+        matcher: Configured EnhancedMatcher instance
+        logger: Logger instance
+        
+    Returns:
+        List of potential matches with metadata
+    """
+    matches = []
+    comparison_count = 0
     match_count = 0
     
-    # Get unique agency names
-    agency_names = df['Agency Name'].dropna().unique()
-    logger.info(f"Found {len(agency_names)} unique agency names to compare")
+    # Get unique normalized names to compare
+    names = df['NameNormalized'].unique()
+    total_comparisons = len(names) * (len(names) - 1) // 2
     
-    # Compare each pair of names
-    for i, name1 in enumerate(agency_names):
-        for name2 in agency_names[i+1:]:
-            total_comparisons += 1
+    logger.info(f"Starting match generation with {len(names)} unique names")
+    logger.info(f"Total comparisons to process: {total_comparisons}")
+    
+    for i, name1 in enumerate(names):
+        for name2 in names[i+1:]:
+            comparison_count += 1
             
-            # Skip if pair already exists
-            if (name1.lower(), name2.lower()) in existing_pairs:
+            # Progress logging
+            if comparison_count % 1000 == 0:
+                progress = (comparison_count / total_comparisons) * 100
+                logger.info(f"Progress: {progress:.1f}% ({comparison_count}/{total_comparisons})")
+            
+            # Skip if already matched
+            pair = tuple(sorted([name1, name2]))
+            if pair in existing_pairs:
                 continue
-                
+            
             # Get similarity score
             score = matcher.find_matches(name1, name2)
             
-            # Only keep matches >= 82.0
-            if score >= 82.0:
+            if score >= 82.0:  # Using threshold from project plan
                 match_count += 1
                 logger.info(f"Found match: '{name1}' - '{name2}' (score: {score})")
                 
-                # Get record IDs
-                source_id = df[df['Agency Name'] == name1]['RecordID'].iloc[0]
-                target_id = df[df['Agency Name'] == name2]['RecordID'].iloc[0]
+                # Get record details
+                record1 = df[df['NameNormalized'] == name1].iloc[0]
+                record2 = df[df['NameNormalized'] == name2].iloc[0]
                 
-                new_matches.append({
+                # Determine match type
+                notes = []
+                if score == 100:
+                    notes.append("Exact match after normalization")
+                if any(term in name1.lower() or term in name2.lower() 
+                      for term in ["dept", "department"]):
+                    notes.append("Department variation")
+                if "nyc" in name1.lower() or "nyc" in name2.lower():
+                    notes.append("NYC prefix/suffix variation")
+                
+                matches.append({
                     'Source': name1,
                     'Target': name2,
                     'Score': round(score, 1),
-                    'Label': 'Match' if score >= 95 else '',  # Auto-label high confidence matches
-                    'SourceID': source_id,
-                    'TargetID': target_id
+                    'Label': 'Match' if score >= 95 else '',
+                    'SourceID': record1['RecordID'],
+                    'TargetID': record2['RecordID'],
+                    'Notes': '; '.join(notes) if notes else ''
                 })
-            
-            if total_comparisons % 1000 == 0:
-                logger.info(f"Processed {total_comparisons} comparisons, found {match_count} matches")
     
-    logger.info(f"Completed comparisons. Total: {total_comparisons}, Matches found: {match_count}")
-    return new_matches
+    logger.info(f"Completed match generation:")
+    logger.info(f"- Processed {comparison_count} comparisons")
+    logger.info(f"- Found {match_count} potential matches")
+    logger.info(f"- Auto-labeled {len([m for m in matches if m['Label'] == 'Match'])} high-confidence matches")
+    
+    return matches
 
-def save_matches(new_matches, logger):
-    """Append new matches to consolidated_matches.csv"""
-    if not new_matches:
-        logger.info("No new matches to save")
-        return
+def save_matches(matches: List[Dict], output_path: Path, logger: logging.Logger) -> None:
+    """Save generated matches to CSV, preserving existing matches"""
+    try:
+        # Convert new matches to DataFrame and sort by score
+        new_matches_df = pd.DataFrame(matches)
+        new_matches_df = new_matches_df.sort_values('Score', ascending=False)
         
-    # Convert to DataFrame and sort by score
-    new_matches_df = pd.DataFrame(new_matches)
-    new_matches_df = new_matches_df.sort_values('Score', ascending=False)
-    
-    # Append to existing file
-    output_file = '../data/processed/consolidated_matches.csv'
-    new_matches_df.to_csv(output_file, mode='a', header=False, index=False)
-    logger.info(f"Saved {len(new_matches)} new matches to {output_file}")
+        if output_path.exists():
+            # Load existing matches
+            existing_matches = pd.read_csv(output_path)
+            logger.info(f"Loaded {len(existing_matches)} existing matches")
+            
+            # Combine existing and new matches
+            combined_matches = pd.concat([existing_matches, new_matches_df], ignore_index=True)
+            
+            # Remove any duplicates based on Source-Target pairs
+            combined_matches = combined_matches.drop_duplicates(
+                subset=['Source', 'Target'], 
+                keep='first'  # Keep existing matches in case of duplicates
+            )
+            
+            # Sort all matches by score
+            combined_matches = combined_matches.sort_values('Score', ascending=False)
+            
+            # Save combined matches
+            combined_matches.to_csv(output_path, index=False)
+            logger.info(f"Added {len(new_matches_df)} new matches to existing {len(existing_matches)} matches")
+            logger.info(f"Total matches after deduplication: {len(combined_matches)}")
+        else:
+            # If no existing file, create new one
+            new_matches_df.to_csv(output_path, index=False)
+            logger.info(f"Created new matches file with {len(new_matches_df)} matches")
+        
+    except Exception as e:
+        logger.error(f"Error saving matches: {e}")
+        raise
 
 def main():
     # Setup
     logger = setup_logging()
     matcher = EnhancedMatcher()
+    output_path = Path('data/processed/consolidated_matches.csv')
     
     try:
-        # Load data
-        logger.info("Loading deduplicated dataset...")
-        df = load_dedup_dataset()
+        # Load merged dataset
+        logger.info("Loading merged dataset...")
+        df = load_merged_dataset()
+        logger.info(f"Loaded {len(df)} records")
         
-        logger.info("Loading existing matches...")
-        existing_matches = load_existing_matches()
-        existing_pairs = get_existing_pairs(existing_matches)
-        logger.info(f"Found {len(existing_pairs)} existing match pairs")
+        # Load existing matches if any
+        existing_pairs = set()
+        if output_path.exists():
+            existing_matches = pd.read_csv(output_path)
+            existing_pairs = {
+                tuple(sorted([row['Source'], row['Target']]))
+                for _, row in existing_matches.iterrows()
+            }
+            logger.info(f"Loaded {len(existing_pairs)} existing matches")
         
-        # Generate and save new matches
+        # Generate new matches
         logger.info("Generating potential matches...")
-        new_matches = generate_potential_matches(df, existing_pairs, matcher, logger)
+        matches = generate_potential_matches(df, existing_pairs, matcher, logger)
         
-        logger.info("Saving new matches...")
-        save_matches(new_matches, logger)
-        
-        logger.info("Match generation completed successfully")
+        # Save results
+        save_matches(matches, output_path, logger)
         
     except Exception as e:
-        logger.error(f"Error during match generation: {e}")
+        logger.error(f"Error in match generation pipeline: {e}")
         raise
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main() 

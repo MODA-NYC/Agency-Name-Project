@@ -62,16 +62,16 @@ merge_dataframes()
 ## Data Flow
 ```
 Input
-├── Primary Dataset (260 records)
+├── Primary Dataset (261 records)
 │   └── nyc_agencies_export.csv
 │
-├── OPS Processed Data (417 → 413 records)
+├── OPS Processed Data (413 records)
 │   ├── RecordID (OPS_XXXXXX)
 │   ├── Agency Name
 │   ├── NameNormalized
 │   └── [Other OPS columns]
 │
-└── HOO Processed Data (178 → 177 records)
+└── HOO Processed Data (179 records)
     ├── RecordID (HOO_XXXXXX)
     ├── Agency Name
     ├── NameNormalized
@@ -79,15 +79,17 @@ Input
     └── [Other HOO columns]
 
 Output (merged_dataset.csv)
-└── Merged DataFrame (851 total records)
+└── Merged DataFrame (658 total records)
     ├── All primary columns
     ├── Standard fields from secondary sources
     ├── Source tracking columns:
     │   ├── source distribution:
     │   │   ├── ops: 413 records
-    │   │   ├── primary: 261 records
-    │   │   └── nyc_gov: 177 records
+    │   │   └── nyc_agencies_export: 245 records
     │   └── data_source (detailed provenance)
+    ├── Source-specific name columns:
+    │   ├── Name - Ops (413 records)
+    │   └── Name - HOO (177 records)
     └── Validated RecordIDs (100% coverage)
 ```
 
@@ -105,11 +107,12 @@ Output (merged_dataset.csv)
    - All records have a valid source
    - Data source derived from name columns or source
 3. Confirm record counts match expectations:
-   - Raw total: 855 records
-   - After processing: 851 records
-   - Delta explained by:
-     - Removed 2 HOO records with no identifying info
-     - OPS deduplication (-4) from previous step
+   - Total records: 658
+   - OPS records: 413
+   - NYC agencies export records: 245
+   - Source-specific names preserved:
+     - Name - Ops: 413 records
+     - Name - HOO: 177 records
 4. Validate data quality:
    - No null values in Agency Name (filled from Name)
    - No null values in NameNormalized (filled using normalizer)
@@ -119,4 +122,5 @@ Output (merged_dataset.csv)
    - Redundant URL columns dropped
 6. Check column name consistency across sources (✓ Confirmed)
    - Standard fields present: RecordID, Agency Name, NameNormalized
-   - Source-specific fields preserved as needed 
+   - Source-specific fields preserved as needed
+   - Name - Ops and Name - HOO columns properly populated 

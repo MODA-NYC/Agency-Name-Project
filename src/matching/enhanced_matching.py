@@ -20,7 +20,8 @@ class EnhancedMatcher:
         self.canonical_names = {
             'education department': [
                 'department education',
-                'public schools new york city'
+                'public schools new york city',
+                'doe'  # Add DOE as a canonical variant
             ]
         }
         
@@ -106,16 +107,43 @@ class EnhancedMatcher:
     def check_acronym_match(self, str1: str, str2: str) -> bool:
         """Check if acronyms match."""
         def extract_acronym(s: str) -> Optional[str]:
-            # Look for parenthetical acronyms
+            # Look for parenthetical acronyms first
             match = re.search(r'\(([A-Z]+)\)', s)
             if match:
+                logging.debug(f"Found parenthetical acronym in '{s}': {match.group(1)}")
                 return match.group(1)
+            
+            # Check if the entire string is an acronym (case insensitive)
+            if len(s) >= 2 and all(c.isalpha() for c in s):
+                s_upper = s.upper()
+                logging.debug(f"Found standalone acronym: '{s_upper}'")
+                return s_upper
+            
+            # Try to generate acronym from words
+            words = s.split()
+            if len(words) >= 2:
+                # Generate standard acronym (first letter of each word)
+                standard_acronym = ''.join(w[0].upper() for w in words if w.lower() not in ['of', 'the', 'and', 'for'])
+                if len(standard_acronym) >= 2:
+                    logging.debug(f"Generated standard acronym from '{s}': {standard_acronym}")
+                    return standard_acronym
+                
+                # Try department-style acronym (e.g., DOE for Department of Education)
+                if words[0].lower() == 'department' and len(words) >= 3 and words[1].lower() == 'of':
+                    dept_acronym = ''.join(w[0].upper() for w in words[2:] if w.lower() not in ['the', 'and', 'for'])
+                    if len(dept_acronym) >= 1:
+                        dept_acronym = 'D' + dept_acronym
+                        logging.debug(f"Generated department acronym from '{s}': {dept_acronym}")
+                        return dept_acronym
+            
+            logging.debug(f"No acronym found for '{s}'")
             return None
             
         acr1 = extract_acronym(str1)
         acr2 = extract_acronym(str2)
         
         if acr1 and acr2:
+            logging.debug(f"Comparing acronyms: {acr1} vs {acr2}")
             return acr1 == acr2
         return False
 
@@ -138,7 +166,7 @@ class EnhancedMatcher:
             base_score += 5
         
         if self.check_acronym_match(str1, str2):
-            base_score += 10
+            base_score += 20  # Increase acronym match bonus
             
         return min(100, base_score)
 

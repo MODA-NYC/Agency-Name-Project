@@ -2,10 +2,10 @@ import pandas as pd
 from typing import List, Dict, Optional, Set, Tuple
 import logging
 from pathlib import Path
-from .matching_algorithm import AgencyMatcher
-from .data_preparation import AgencyNamePreprocessor
-from .string_matching import get_composite_score  # Add this import
-from .enhanced_matching import EnhancedMatcher
+from src.matching.matcher import AgencyMatcher
+from src.data_preparation import AgencyNamePreprocessor
+from src.matching.string_matching import get_composite_score
+from src.matching.enhanced_matching import EnhancedMatcher
 
 class PotentialMatchGenerator:
     """

@@ -27,6 +27,12 @@ class OpsDataProcessor(BaseDataProcessor):
 
         # Create normalized name column directly from Agency Name
         df['NameNormalized'] = df['Agency Name'].apply(full_standardize_name)
+        
+        # Preserve original name in OPS_Name column
+        df['OPS_Name'] = df['Agency Name']
+        
+        # Add source column
+        df['source'] = 'ops'
 
         # Add RecordID column if it doesn't exist
         if 'RecordID' not in df.columns:

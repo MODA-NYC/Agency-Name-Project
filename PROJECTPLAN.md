@@ -12,12 +12,39 @@ This project aims to produce a single, standardized, authoritative dataset of Ne
 - Completed:
   - Integrated new sources (`nyc_gov_hoo.csv`, `ops_data.csv`).
   - Established source-level normalization and merged datasets into a single intermediate dataset.
+  - Successfully implemented source-specific name preservation in `merged_dataset.csv`.
+  - Created centralized pipeline orchestration through `main.py`.
 - Challenges Discovered:
   - Certain data sources (e.g., HOO data) rely on multiple fields (Agency Name, HoO Title) to distinguish unique entities.
   - Using Agency Name alone leads to ambiguous merges and loss of detail.
   - Relying solely on one column for normalization and deduplication may collapse distinct entities.
 
 ## Project Plan
+
+### Pipeline Orchestration
+
+The project uses `main.py` as the central orchestrator for all data processing steps. This script:
+1. Coordinates the execution of all preprocessing, merging, and analysis tasks
+2. Maintains consistent logging and error handling
+3. Generates intermediate and final outputs in the appropriate directories
+4. Ensures proper sequencing of data transformation steps
+
+### Data Processing Pipeline
+
+1. **Source Processing & Normalization** (Orchestrated by `main.py`)
+   - Process each source through dedicated processors
+   - Generate normalized intermediate files
+   - Track processing statistics and data quality metrics
+
+2. **Merging & Integration** (Orchestrated by `main.py`)
+   - Combine processed sources into `merged_dataset.csv`
+   - Preserve source-specific names in dedicated columns
+   - Track data provenance and merge decisions
+
+3. **Matching & Deduplication** (Future work)
+   - Use `merged_dataset.csv` as input for fuzzy matching
+   - Generate and verify potential matches
+   - Produce final deduplicated dataset
 
 ## 1. Preprocessing & Source-Level Normalization
 
@@ -40,15 +67,21 @@ This project aims to produce a single, standardized, authoritative dataset of Ne
 
 ## 2. Merging & Integration
 
-**Objective**: Combine the preprocessed source DataFrames into a single master `merged_dataset.csv`.
+**Objective**: Combine the preprocessed source DataFrames into a single master dataset.
 
-1. **Merging** (`src/data_merging.py`)  
-   - Load the primary dataset (e.g., `nyc_agencies_export.csv`) plus each processed DataFrame.
-   - Use consistent field mappings (e.g. `AgencyNameEnriched`) and ensure each record has a `RecordID`.
-   - Concatenate them with provenance tracking (e.g., `source` column).
+1. **Initial Merge** (`src/data_merging.py`)  
+   - Load the primary dataset (e.g., `nyc_agencies_export.csv`) plus each processed DataFrame
+   - Use consistent field mappings and ensure each record has a `RecordID`
+   - Generate `merged_dataset.csv` with:
+     - Source-specific name columns (`Name - Ops`, `Name - HOO`)
+     - Clear data provenance tracking
+     - Preserved original names from each source
+   - Store in `data/intermediate/` for subsequent processing
 
 2. **Clean & Deduplicate**  
-   - Eliminate empty rows, handle column collisions (URL fields, etc.), and remove duplicates based on `RecordID` or `NameNormalized` as appropriate.
+   - Eliminate empty rows, handle column collisions
+   - Remove duplicates based on `RecordID`
+   - Prepare dataset for fuzzy matching phase
 
 ## 3. Matching & Deduplication
 
@@ -72,26 +105,44 @@ This project aims to produce a single, standardized, authoritative dataset of Ne
    - Document any special cases or patterns
 
 ### 3.2 Apply Verified Matches
+
+**Objective**: Apply manually verified matches from `consolidated_matches.csv` to produce a final, fully deduplicated dataset that **preserves source-specific columns** (e.g., `Name - Ops` and `Name - NYC.gov Redesign`).
+
 1. **Load & Filter**
-   - Load deduplicated dataset
-   - Load verified matches from `consolidated_matches.csv`
-   - Filter for "Match" labels
+   - Load deduplicated dataset (output of Step 2.2).
+   - Load verified matches from `consolidated_matches.csv`.
+   - Filter for "Match" labels.
 
 2. **Process Matches**
-   - Apply source preference rules
-   - Merge record information
-   - Preserve non-null values
-   - Update metadata and tracking
+   - Sort matches by score (descending) or follow user-labeled order.
+   - For each verified match:
+     - Attempt a direct RecordID-based match first (if both sides have valid IDs).
+     - If no direct ID match, attempt name or fuzzy matching on the final dataset.
+     - **Preserve `Name - Ops` and `Name - HOO` Fields**:
+       - Retrieve non-null values from both matched records.
+       - If multiple distinct values exist for either field, combine them (e.g., comma-separated).
+       - If only one record has a value, copy it over to the merged record.
+       - Ensure the final merged record retains all relevant `Name - Ops` and `Name - HOO` data.
+     - Apply source preference rules (e.g., prefer `nyc_agencies_export` over `ops` over `nyc_gov` if conflicts arise).
+     - Merge record information (including other columns) and preserve non-null values.
+     - Update provenance and metadata to indicate which fields came from each record.
 
 3. **Generate Output**
-   - Save final deduplicated dataset
-   - Create merge summary
-   - Maintain audit trail
+   - Save the final merged (deduplicated) dataset to a new file (e.g., `final_deduplicated_dataset.csv`).
+   - Each record should now have:
+     - A single `RecordID`.
+     - A unified `NameNormalized`.
+     - Possibly combined (or unioned) `Name - Ops` and `Name - NYC.gov Redesign` fields from all matched sources.
+   - Maintain an audit trail that shows how each record was formed.
 
 4. **Validate Results**
-   - Verify match application
-   - Check remaining duplicates
-   - Validate information preservation
+   - Verify match application:
+     - Check that each pair labeled "Match" was merged correctly.
+   - Check remaining duplicates:
+     - Confirm no unintended additional duplicates remain.
+   - Validate information preservation:
+     - Confirm that `Name - Ops` and `Name - NYC.gov Redesign` fields are populated where applicable.
+     - Ensure no critical source data was overwritten or lost during the merge.
 
 ### 3.3 Quality Assurance
 1. **Completeness Check**

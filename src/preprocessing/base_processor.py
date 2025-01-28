@@ -9,7 +9,7 @@ class BaseDataProcessor:
     
     def __init__(self, source_name: str):
         self.source_name = source_name
-        self.duplicate_path = f'../data/analysis/raw_duplicates_{source_name}.csv'
+        self.duplicate_path = f'data/analysis/raw_duplicates_{source_name}.csv'
         self.normalizer = NameNormalizer()
         
     def standardize_name(self, name: str) -> str:

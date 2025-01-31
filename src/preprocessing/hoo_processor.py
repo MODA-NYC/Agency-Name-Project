@@ -48,18 +48,34 @@ class HooDataProcessor(BaseDataProcessor):
         # Create normalized name directly from Agency Name
         df['NameNormalized'] = df['Agency Name'].apply(full_standardize_name)
         
-        # Create AgencyNameEnriched by combining Agency Name and HoO Title if available
-        if 'HeadOfOrganizationTitle' in df.columns and df['HeadOfOrganizationTitle'].notna().any():
-            df['AgencyNameEnriched'] = df.apply(
-                lambda row: f"{row['Agency Name']} - {row['HeadOfOrganizationTitle']}"
-                if pd.notna(row['HeadOfOrganizationTitle']) else row['Agency Name'],
-                axis=1
+        # Special handling for "Mayor, Office of the" records
+        def enrich_agency_name(row):
+            if pd.isna(row['Agency Name']):
+                return row['Agency Name']  # Return NaN as is
+            agency_name = str(row['Agency Name']).strip()
+            if agency_name == "Mayor, Office of the" and pd.notna(row['HeadOfOrganizationTitle']):
+                # For Mayor's Office records, combine with HoO Title and normalize
+                title = str(row['HeadOfOrganizationTitle']).strip()
+                enriched = f"Mayor's Office - {title}"
+                logging.info(f"Enriching Mayor's Office record: {enriched}")
+                return enriched
+            return agency_name
+
+        # Create AgencyNameEnriched using the new enrichment logic
+        if 'HeadOfOrganizationTitle' in df.columns:
+            df['AgencyNameEnriched'] = df.apply(enrich_agency_name, axis=1)
+            
+            # Update NameNormalized for Mayor's Office records to include the title
+            mayors_office_mask = df['Agency Name'].str.strip() == "Mayor, Office of the"
+            df.loc[mayors_office_mask & df['HeadOfOrganizationTitle'].notna(), 'NameNormalized'] = (
+                df.loc[mayors_office_mask & df['HeadOfOrganizationTitle'].notna(), 'AgencyNameEnriched']
+                .apply(full_standardize_name)
             )
         else:
             df['AgencyNameEnriched'] = df['Agency Name']
         
         # Preserve original name in HOO_Name column
-        df['HOO_Name'] = df['Agency Name']
+        df['HOO_Name'] = df['AgencyNameEnriched']  # Now using enriched name to preserve the full context
         
         # Add source column
         df['source'] = 'nyc_gov'
@@ -71,5 +87,12 @@ class HooDataProcessor(BaseDataProcessor):
         logging.info(f"HOO data columns after processing: {df.columns.tolist()}")
         logging.info(f"Sample HOO_Name values: {df['HOO_Name'].head().tolist()}")
         logging.info(f"Sample normalized names: {df['NameNormalized'].head().tolist()}")
+        
+        # Log specific info about Mayor's Office records
+        mayors_office_records = df[df['Agency Name'].str.strip() == "Mayor, Office of the"]
+        logging.info(f"Found {len(mayors_office_records)} Mayor's Office records")
+        logging.info("Sample Mayor's Office enriched names:")
+        for _, row in mayors_office_records.head().iterrows():
+            logging.info(f"Original: {row['Agency Name']} | Enriched: {row['AgencyNameEnriched']}")
 
         return df

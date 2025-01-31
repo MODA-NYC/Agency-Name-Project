@@ -15,7 +15,7 @@ def merge_dataframes(primary_df: pd.DataFrame, ops_df: pd.DataFrame, hoo_df: pd.
     
     # Store original names before merging
     ops['OPS_Name'] = ops['Agency Name']
-    hoo['HOO_Name'] = hoo['Agency Name']
+    hoo['HOO_Name'] = hoo['AgencyNameEnriched'] if 'AgencyNameEnriched' in hoo.columns else hoo['Agency Name']
     
     logging.info(f"Sample HOO_Name values before merge: {hoo['HOO_Name'].head().tolist()}")
     logging.info(f"Sample HOO normalized names: {hoo['NameNormalized'].head().tolist()}")
@@ -34,7 +34,7 @@ def merge_dataframes(primary_df: pd.DataFrame, ops_df: pd.DataFrame, hoo_df: pd.
     
     # Define columns to keep from each source
     ops_cols = ['RecordID', 'NameNormalized', 'OPS_Name', 'Agency Name', 'Entity type', 'source']
-    hoo_cols = ['RecordID', 'NameNormalized', 'HOO_Name', 'Agency Name', 'HeadOfOrganizationName', 'HeadOfOrganizationTitle', 'source']
+    hoo_cols = ['RecordID', 'NameNormalized', 'HOO_Name', 'Agency Name', 'HeadOfOrganizationName', 'HeadOfOrganizationTitle', 'source', 'AgencyNameEnriched']
     
     # First merge: Primary and OPS (outer join)
     merged = pd.merge(
@@ -63,9 +63,13 @@ def merge_dataframes(primary_df: pd.DataFrame, ops_df: pd.DataFrame, hoo_df: pd.
         indicator='merge_hoo'
     )
     
-    # For records only in HOO, copy HOO_Name to Name
+    # For records only in HOO, use AgencyNameEnriched or HOO_Name for Name
     hoo_only_mask = merged['merge_hoo'] == 'right_only'
-    merged.loc[hoo_only_mask, 'Name'] = merged.loc[hoo_only_mask, 'HOO_Name']
+    merged.loc[hoo_only_mask, 'Name'] = (
+        merged.loc[hoo_only_mask, 'AgencyNameEnriched'].fillna(
+            merged.loc[hoo_only_mask, 'HOO_Name']
+        )
+    )
     
     logging.info(f"HOO merge stats:\n{merged['merge_hoo'].value_counts()}")
     logging.info(f"Columns after HOO merge: {merged.columns.tolist()}")
@@ -76,9 +80,9 @@ def merge_dataframes(primary_df: pd.DataFrame, ops_df: pd.DataFrame, hoo_df: pd.
         axis=1
     )
     
-    # Clean up merge artifacts but preserve source-specific names
+    # Clean up merge artifacts but preserve source-specific names and enriched names
     cols_to_drop = [col for col in merged.columns if col.endswith(('_ops', '_hoo')) 
-                   and col not in ['OPS_Name', 'HOO_Name']]
+                   and col not in ['OPS_Name', 'HOO_Name', 'AgencyNameEnriched']]
     
     # Log columns being dropped and preserved
     logging.info(f"Columns being dropped: {cols_to_drop}")
@@ -86,14 +90,9 @@ def merge_dataframes(primary_df: pd.DataFrame, ops_df: pd.DataFrame, hoo_df: pd.
     
     result = merged.drop(columns=cols_to_drop + ['merge_ops', 'merge_hoo'])
     
-    # Log presence of columns and sample values before cleanup
-    logging.info(f"OPS_Name and HOO_Name present before cleanup: {['OPS_Name' in result.columns, 'HOO_Name' in result.columns]}")
-    logging.info(f"Sample HOO_Name values after merge: {result['HOO_Name'].head().tolist()}")
-    logging.info(f"Sample matched HOO_Name values: {result[result['HOO_Name'].notna()]['HOO_Name'].head().tolist()}")
-    
     # Create Name - Ops and Name - HOO columns
     result['Name - Ops'] = result['OPS_Name']
-    result['Name - HOO'] = result['HOO_Name']
+    result['Name - HOO'] = result['AgencyNameEnriched'].fillna(result['HOO_Name'])
     
     # Initialize data_source column if it doesn't exist
     if 'data_source' not in result.columns:
@@ -120,7 +119,7 @@ def merge_dataframes(primary_df: pd.DataFrame, ops_df: pd.DataFrame, hoo_df: pd.
     result.loc[name_fill_mask & result['Name - HOO'].notna(), 'Name'] = result.loc[name_fill_mask & result['Name - HOO'].notna(), 'Name - HOO']
     
     # Drop the original OPS_Name and HOO_Name columns as we now have Name - Ops and Name - HOO
-    result = result.drop(columns=['OPS_Name', 'HOO_Name'], errors='ignore')
+    result = result.drop(columns=['OPS_Name', 'HOO_Name', 'AgencyNameEnriched'], errors='ignore')
     
     # Log presence of columns after cleanup
     logging.info(f"OPS_Name and HOO_Name present after cleanup: {['OPS_Name' in result.columns, 'HOO_Name' in result.columns]}")

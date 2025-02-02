@@ -7,6 +7,14 @@ import json
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+def is_library(record):
+    """
+    Helper function to determine if a record is a library reference.
+    Checks if the 'Name' field contains the substring "library".
+    """
+    name_field = record.get("Name") or ""
+    return "library" in name_field.lower()
+
 def get_preferred_record(rec1, rec2):
     """
     Determine the preferred record based on source priority.
@@ -28,7 +36,8 @@ def merge_records(primary, secondary):
     """
     Merge two records.
     For each column:
-      - For columns starting with "Name -", if both values exist and are different, join with " | ".
+      - For columns starting with "Name -", if both values exist and are different,
+        split their values by semicolon and merge unique parts using "; " as the delimiter.
       - Otherwise, use the primary value if not null; if null, use the secondary.
     Also update merged_from and merge_note fields.
     """
@@ -50,13 +59,24 @@ def merge_records(primary, secondary):
     for col in primary.index:
         val_primary = primary[col]
         val_secondary = secondary[col]
-        # For source-specific name columns, combine if both exist and are different
+        # For source-specific name columns, merge using semicolon delimiter
         if col.startswith("Name -"):
             if pd.notna(val_primary) and pd.notna(val_secondary):
-                # If they are different and not already merged
-                if str(val_primary).strip().lower() != str(val_secondary).strip().lower():
-                    merged[col] = f"{val_primary} | {val_secondary}"
-                # Else keep one value
+                # Normalize values for comparison
+                norm_primary = str(val_primary).strip().lower()
+                norm_secondary = str(val_secondary).strip().lower()
+                if norm_primary != norm_secondary:
+                    # Split each value by semicolon and strip whitespace
+                    parts_primary = [part.strip() for part in str(val_primary).split(";") if part.strip()]
+                    parts_secondary = [part.strip() for part in str(val_secondary).split(";") if part.strip()]
+                    # Combine unique values (case-insensitive)
+                    combined = parts_primary[:]
+                    for part in parts_secondary:
+                        if part.lower() not in [p.lower() for p in combined]:
+                            combined.append(part)
+                    merged[col] = "; ".join(combined)
+                else:
+                    merged[col] = val_primary
             elif pd.isna(val_primary) and pd.notna(val_secondary):
                 merged[col] = val_secondary
         # For the 'merged_from' and 'merge_note' columns, we handle after loop
@@ -96,7 +116,7 @@ def apply_matches(input_path, matches_path, output_path):
         # Skip if names are missing
         if pd.isna(source_name) or pd.isna(target_name):
             continue
-        
+            
         # Build masks for matching records (case-insensitive on Name, Name - Ops, Name - HOO)
         def build_mask(name):
             name_lower = name.lower().strip()
@@ -130,20 +150,19 @@ def apply_matches(input_path, matches_path, output_path):
         source_record = source_records[~source_records["processed"]].iloc[0] if not source_records[~source_records["processed"]].empty else source_records.iloc[0]
         target_record = target_records[~target_records["processed"]].iloc[0] if not target_records[~target_records["processed"]].empty else target_records.iloc[0]
         
-        # IMPORTANT: Do not merge if both records already come from the same source group
-        # i.e. if both have a non-null "Name - HOO" OR both have a non-null "Name - Ops", then skip merging.
+        # Check if both records already have a value in the same source-specific field.
         source_HOO = source_record.get("Name - HOO")
         target_HOO = target_record.get("Name - HOO")
         source_OPS = source_record.get("Name - Ops")
         target_OPS = target_record.get("Name - Ops")
-        # Check if both records already have a value in the same source-specific field.
-        if (pd.notna(source_HOO) and pd.notna(target_HOO)) or (pd.notna(source_OPS) and pd.notna(target_OPS)):
+        # Modified condition: allow merging if the records are libraries even when both have a value.
+        if ((pd.notna(source_HOO) and pd.notna(target_HOO)) or (pd.notna(source_OPS) and pd.notna(target_OPS))) and not (is_library(source_record) and is_library(target_record)):
             # Mark both as processed but do not merge; they remain separate rows.
             result_df.loc[source_record.name, "processed"] = True
             result_df.loc[target_record.name, "processed"] = True
             continue
         
-        # Otherwise, merge the records (from different source groups)
+        # Otherwise, merge the records (from different source groups or library records)
         primary_record, secondary_record = get_preferred_record(source_record, target_record)
         merged_record = merge_records(primary_record, secondary_record)
         preferred_index = primary_record.name
@@ -173,10 +192,13 @@ def apply_matches(input_path, matches_path, output_path):
 if __name__ == "__main__":
     # Set up logging and determine paths relative to the project root
     logging.basicConfig(level=logging.INFO)
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    project_root = os.path.abspath(os.path.join(script_dir, ".."))
+    project_root = os.getcwd()  # Use current working directory as project root
     data_dir = os.path.join(project_root, "data", "processed")
     intermediate_dir = os.path.join(project_root, "data", "intermediate")
+    
+    logger.info(f"Project root: {project_root}")
+    logger.info(f"Data dir: {data_dir}")
+    logger.info(f"Intermediate dir: {intermediate_dir}")
     
     apply_matches(
         input_path=os.path.join(intermediate_dir, "merged_dataset.csv"),

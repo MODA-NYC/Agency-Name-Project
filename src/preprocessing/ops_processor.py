@@ -38,4 +38,12 @@ class OpsDataProcessor(BaseDataProcessor):
         if 'RecordID' not in df.columns:
             df['RecordID'] = df.index.map(lambda x: f'OPS_{x:06d}')
 
+        # Rename specific library entries for consistency
+        df.loc[df['Agency Name'].str.strip() == "Brooklyn Public Library Board of Trustees", 'Agency Name'] = "Brooklyn Public Library"
+        
+        # Update normalized name for renamed records
+        mask = df['Agency Name'] == "Brooklyn Public Library"
+        df.loc[mask, 'NameNormalized'] = full_standardize_name("Brooklyn Public Library")
+        df.loc[mask, 'OPS_Name'] = "Brooklyn Public Library"
+
         return df

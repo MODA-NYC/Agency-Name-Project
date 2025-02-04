@@ -9,7 +9,10 @@ from preprocessing.data_normalization import standardize_name as full_standardiz
 from matching.matcher import AgencyMatcher
 from analysis.quality_checker import DataQualityChecker
 from data_merging import merge_dataframes, clean_merged_data, track_data_provenance, ensure_record_ids
-from preprocessing.global_normalization import apply_global_normalization  # Newly imported for global normalization
+from preprocessing.global_normalization import apply_global_normalization
+
+# Import the apply_matches function from its module.
+from apply_matches import apply_matches
 
 def validate_dataframe_columns(df: pd.DataFrame, required_cols: List[str], df_name: str) -> None:
     """Validate that required columns exist in DataFrame."""
@@ -17,24 +20,156 @@ def validate_dataframe_columns(df: pd.DataFrame, required_cols: List[str], df_na
     if missing_cols:
         raise ValueError(f"Missing required columns in {df_name}: {missing_cols}")
 
-def main(data_dir: str, log_level: str, display: bool, save: bool):
-    # Ensure output directories exist
+def apply_manual_overrides(final_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Applies manual override mappings to the final deduplicated dataset.
+    For each record whose current Name (normalized to lowercase and stripped)
+    matches one of the override keys, update the Name and Acronym fields as specified.
+    """
+    # Define override mappings (keys are lowercased old names)
+    overrides = {
+        'atlantic yards community development corporation (aycdc)': {
+            'Name': 'Atlantic Yards Community Development Corporation',
+            'Acronym': ''
+        },
+        'center for brooklyn history (formerly known brooklyn historical society)': {
+            'Name': 'Center for Brooklyn History',
+            'Acronym': ''
+        },
+        'boro president bronx': {
+            'Name': 'Borough President - Bronx',
+            'Acronym': ''
+        },
+        'boro president brooklyn': {
+            'Name': 'Borough President - Brooklyn',
+            'Acronym': ''
+        },
+        'boro president manhattan': {
+            'Name': 'Borough President - Manhattan',
+            'Acronym': ''
+        },
+        'boro president queens': {
+            'Name': 'Borough President - Queens',
+            'Acronym': ''
+        },
+        'boro president staten island': {
+            'Name': 'Borough President - Staten Island',
+            'Acronym': ''
+        },
+        'cig - brooklyn academy of music (bam)': {
+            'Name': 'CIG - Brooklyn Academy of Music',
+            'Acronym': 'BAM'
+        },
+        'cig - snug harbor cultural center & botanical garden (shcc)': {
+            'Name': 'CIG - Snug Harbor Cultural Center & Botanical Garden',
+            'Acronym': 'SHCC'
+        },
+        'cig - staten island museum (also known as siias)': {
+            'Name': 'CIG - Staten Island Museum',
+            'Acronym': 'SIIAS'
+        },
+        "citizens' advisory committee (dcla)": {
+            'Name': "Citizens' Advisory Committee",
+            'Acronym': ''
+        },
+        'community services board (formerly known as mental hygiene advisory board)': {
+            'Name': 'Community Services Board',
+            'Acronym': ''
+        },
+        'creative communications': {
+            'Name': 'Office of Creative Communications',
+            'Acronym': ''
+        },
+        'district attorney - kings county (brooklyn)': {
+            'Name': 'District Attorney - Kings County',
+            'Acronym': ''
+        },
+        'district attorney - new york county (manhattan)': {
+            'Name': 'District Attorney - New York County',
+            'Acronym': ''
+        },
+        'district attorney - queens county': {
+            'Name': 'District Attorney - Queens County',
+            'Acronym': ''
+        },
+        'district attorney - richmond county (staten island)': {
+            'Name': 'District Attorney - Richmond County',
+            'Acronym': ''
+        },
+        'counsel to the mayor': {
+            'Name': 'Chief Counsel to the Mayor and City Hall',
+            'Acronym': ''
+        },
+        "mayor's office -- media and research analysis": {
+            'Name': "Mayor's Office - Media and Research Analysis",
+            'Acronym': ''
+        },
+        "mayor's office -- speechwriting": {
+            'Name': "Mayor's Office - Speechwriting",
+            'Acronym': ''
+        },
+        'media, nyc': {
+            'Name': 'NYC Media',
+            'Acronym': ''
+        },
+        "nonprofit services, mayor's office of (mons)": {
+            'Name': "Mayor's Office of Nonprofit Services",
+            'Acronym': 'MONS'
+        },
+        'queens county public administrator': {
+            'Name': 'Public Administrator - Queens County',
+            'Acronym': ''
+        },
+        'richmond county public administrator': {
+            'Name': 'Public Administrator - Richmond County',
+            'Acronym': ''
+        },
+        'school construction authority- board of trustees': {
+            'Name': 'School Construction Authority - Board of Trustees',
+            'Acronym': ''
+        },
+        'sustainability advisory board (formerly oneync)': {
+            'Name': 'Sustainability Advisory Board',
+            'Acronym': ''
+        },
+        'temporary commercial incentive area boundary commission (icap)': {
+            'Name': 'Temporary Commercial Incentive Area Boundary Commission',
+            'Acronym': 'ICAP'
+        },
+        'traffic mobility review board (aka congestion pricing)': {
+            'Name': 'Traffic Mobility Review Board',
+            'Acronym': ''
+        }
+    }
+    
+    for idx, row in final_df.iterrows():
+        current_name = str(row.get('Name', '')).strip().lower()
+        if current_name in overrides:
+            override = overrides[current_name]
+            final_df.at[idx, 'Name'] = override['Name']
+            if 'Acronym' in final_df.columns:
+                final_df.at[idx, 'Acronym'] = override['Acronym']
+            else:
+                final_df['Acronym'] = override['Acronym']
+            logging.info(f"Applied override for '{current_name}': set Name to '{override['Name']}' and Acronym to '{override['Acronym']}'")
+    return final_df
+
+def main(data_dir: str, log_level: str, display: bool, save: bool, apply_matches_flag: bool):
+    # Ensure necessary directories exist
     os.makedirs(os.path.join(data_dir, 'analysis'), exist_ok=True)
     os.makedirs(os.path.join(data_dir, 'processed'), exist_ok=True)
     os.makedirs(os.path.join(data_dir, 'intermediate'), exist_ok=True)
     
-    # Setup logging
     logging.basicConfig(level=log_level)
     logger = logging.getLogger(__name__)
     
     try:
-        # Initialize processors
+        # Initialize processors and other components
         ops_processor = OpsDataProcessor()
         hoo_processor = HooDataProcessor()
         matcher = AgencyMatcher()
         quality_checker = DataQualityChecker(output_dir=os.path.join(data_dir, 'analysis'))
         
-        # Validate input files exist
         required_files = {
             'ops_data': os.path.join(data_dir, 'raw', 'ops_data.csv'),
             'hoo_data': os.path.join(data_dir, 'raw', 'nyc_gov_hoo.csv'),
@@ -45,7 +180,6 @@ def main(data_dir: str, log_level: str, display: bool, save: bool):
             if not os.path.exists(path):
                 raise FileNotFoundError(f"Required file not found: {path}")
         
-        # Process each data source
         logger.info("Processing OPS data...")
         ops_data = ops_processor.process(required_files['ops_data'])
         validate_dataframe_columns(ops_data, ['Agency Name', 'NameNormalized', 'RecordID'], 'ops_data')
@@ -56,15 +190,12 @@ def main(data_dir: str, log_level: str, display: bool, save: bool):
         validate_dataframe_columns(hoo_data, ['Agency Name', 'NameNormalized', 'RecordID'], 'hoo_data')
         logger.info(f"HOO data records: {len(hoo_data)}")
 
-        # Load and validate primary data source
         nyc_agencies_export = pd.read_csv(required_files['nyc_agencies'])
         validate_dataframe_columns(nyc_agencies_export, ['Name'], 'nyc_agencies_export')
         logger.info(f"NYC agencies export records: {len(nyc_agencies_export)}")
         
-        # Normalize names in primary dataframe
         nyc_agencies_export['NameNormalized'] = nyc_agencies_export['Name'].apply(full_standardize_name)
         
-        # Merge datasets
         logger.info("Merging datasets...")
         merged_df = merge_dataframes(nyc_agencies_export, ops_data, hoo_data)
         logger.info(f"Merged dataset row count (pre-clean): {len(merged_df)}")
@@ -74,7 +205,6 @@ def main(data_dir: str, log_level: str, display: bool, save: bool):
         
         merged_df = track_data_provenance(merged_df)
         
-        # Ensure NameNormalized and RecordID exist
         if 'NameNormalized' not in merged_df.columns:
             logger.warning("'NameNormalized' column missing, attempting to derive from 'Name'")
             if 'Name' in merged_df.columns:
@@ -83,29 +213,33 @@ def main(data_dir: str, log_level: str, display: bool, save: bool):
                 raise ValueError("No 'Name' column to derive 'NameNormalized' from.")
         
         merged_df = ensure_record_ids(merged_df, prefix='REC_')
-
-        # Apply global normalization to finalize NameNormalized
         merged_df = apply_global_normalization(merged_df)
         
-        # Deduplicate based on RecordID
         before_dedup = len(merged_df)
         merged_df = merged_df.drop_duplicates(subset=['RecordID'], keep='first')
         after_dedup = len(merged_df)
         logger.info(f"Removed {before_dedup - after_dedup} duplicate records based on RecordID.")
         
-        # Save merged dataset
-        merged_path = os.path.join(data_dir, 'intermediate', 'merged_dataset.csv')
-        merged_df.to_csv(merged_path, index=False)
-        logger.info(f"Merged dataset saved to {merged_path}. Final row count: {len(merged_df)}")
+        # Apply manual override mappings to adjust final names and acronyms
+        merged_df = apply_manual_overrides(merged_df)
         
-        # Run quality checks
+        final_path = os.path.join(data_dir, 'processed', 'final_deduplicated_dataset.csv')
+        merged_df.to_csv(final_path, index=False)
+        logger.info(f"Final deduplicated dataset saved to {final_path}. Final row count: {len(merged_df)}")
+        
         logger.info("Running quality checks...")
-        quality_checker.analyze_dataset(merged_df, 'NameNormalized', 'merged_dataset')
+        quality_checker.analyze_dataset(merged_df, 'NameNormalized', 'final_deduplicated_dataset')
         
-        logger.info("Process completed successfully")
+        # If the flag is set, apply verified matches by calling the external apply_matches module.
+        if apply_matches_flag:
+            intermediate_dir = os.path.join(data_dir, 'intermediate')
+            matches_path = os.path.join(data_dir, 'processed', 'consolidated_matches.csv')
+            logger.info("Applying verified matches to final deduplicated dataset...")
+            apply_matches(input_path=final_path, matches_path=matches_path,
+                          output_path=os.path.join(data_dir, 'processed', 'final_deduplicated_dataset.csv'))
         
         if display:
-            logger.info("\nMerged Data Sample:")
+            logger.info("\nFinal Dataset Sample:")
             print(merged_df.head())
         
     except Exception as e:
@@ -118,6 +252,7 @@ if __name__ == "__main__":
     parser.add_argument('--log-level', type=str, default='INFO', help='Logging level')
     parser.add_argument('--display', action='store_true', help='Display the head of DataFrames')
     parser.add_argument('--save', action='store_true', help='Save intermediate results')
+    parser.add_argument('--apply-matches', action='store_true', help='Apply verified matches after deduplication')
     
     args = parser.parse_args()
-    main(args.data_dir, args.log_level, args.display, args.save)
+    main(args.data_dir, args.log_level, args.display, args.save, args.apply_matches)

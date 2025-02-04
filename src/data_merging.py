@@ -17,6 +17,10 @@ def merge_dataframes(primary_df: pd.DataFrame, ops_df: pd.DataFrame, hoo_df: pd.
     ops['OPS_Name'] = ops['Agency Name']
     hoo['HOO_Name'] = hoo['AgencyNameEnriched'] if 'AgencyNameEnriched' in hoo.columns else hoo['Agency Name']
     
+    # Create PrincipalOfficerName from HeadOfOrganizationName
+    if 'HeadOfOrganizationName' in hoo.columns:
+        hoo['PrincipalOfficerName'] = hoo['HeadOfOrganizationName']
+    
     logging.info(f"Sample HOO_Name values before merge: {hoo['HOO_Name'].head().tolist()}")
     logging.info(f"Sample HOO normalized names: {hoo['NameNormalized'].head().tolist()}")
     logging.info(f"Sample primary normalized names: {primary['NameNormalized'].head().tolist()}")
@@ -34,7 +38,7 @@ def merge_dataframes(primary_df: pd.DataFrame, ops_df: pd.DataFrame, hoo_df: pd.
     
     # Define columns to keep from each source
     ops_cols = ['RecordID', 'NameNormalized', 'OPS_Name', 'Agency Name', 'Entity type', 'source']
-    hoo_cols = ['RecordID', 'NameNormalized', 'HOO_Name', 'Agency Name', 'HeadOfOrganizationName', 'HeadOfOrganizationTitle', 'source', 'AgencyNameEnriched']
+    hoo_cols = ['RecordID', 'NameNormalized', 'HOO_Name', 'Agency Name', 'HeadOfOrganizationName', 'HeadOfOrganizationTitle', 'source', 'AgencyNameEnriched', 'PrincipalOfficerContactURL', 'PrincipalOfficerName']
     
     # First merge: Primary and OPS (outer join)
     merged = pd.merge(

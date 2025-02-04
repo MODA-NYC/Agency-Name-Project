@@ -95,4 +95,13 @@ class HooDataProcessor(BaseDataProcessor):
         for _, row in mayors_office_records.head().iterrows():
             logging.info(f"Original: {row['Agency Name']} | Enriched: {row['AgencyNameEnriched']}")
 
+        # Handle OTI duplicates - drop the redundant record
+        oti_mask = df['Agency Name'].str.contains('Technology and Innovation', case=False, na=False)
+        if oti_mask.sum() > 1:
+            # Keep the record with "Office of Technology and Innovation" and drop others
+            keep_mask = df['Agency Name'].str.startswith('Office of Technology and Innovation', na=False)
+            drop_mask = oti_mask & ~keep_mask
+            logging.info(f"Dropping {drop_mask.sum()} redundant OTI records")
+            df = df[~drop_mask]
+
         return df

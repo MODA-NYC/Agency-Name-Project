@@ -100,9 +100,16 @@ def merge_records(primary, secondary):
     return merged
 
 def apply_matches(input_path, matches_path, output_path):
-    # Read input data and matches
-    df = pd.read_csv(input_path)
-    matches = pd.read_csv(matches_path)
+    # Read input data and matches with encoding handling
+    try:
+        df = pd.read_csv(input_path, encoding='utf-8')
+    except UnicodeDecodeError:
+        df = pd.read_csv(input_path, encoding='latin1')
+    
+    try:
+        matches = pd.read_csv(matches_path, encoding='utf-8')
+    except UnicodeDecodeError:
+        matches = pd.read_csv(matches_path, encoding='latin1')
     
     # Create a working copy of the dataframe and add a processed flag
     result_df = df.copy()

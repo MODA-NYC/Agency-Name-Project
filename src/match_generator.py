@@ -299,3 +299,51 @@ class PotentialMatchGenerator:
             new_matches_df.to_csv('data/processed/consolidated_matches.csv', 
                                 mode='a', header=False, index=False)
 
+    def process_new_matches_from_final_dedup(self, min_score: float = 80.0, batch_size: int = 1000):
+        """
+        Load the final deduplicated dataset from 'data/processed/final_deduplicated_dataset.csv'
+        and generate potential matches from it. This method uses the final deduplicated dataset
+        as the basis for identifying additional potential matches.
+        
+        Args:
+            min_score: Minimum similarity score to consider (default: 80.0).
+            batch_size: Number of matches to write at once (default: 1000).
+        """
+        try:
+            # Load the final deduplicated dataset
+            final_df = pd.read_csv('data/processed/final_deduplicated_dataset.csv')
+            self.logger.info(f"Loaded final deduplicated dataset with {len(final_df)} records")
+            
+            # Process matches using the final deduplicated dataset
+            # We use 'Name' as the name column since that's the standard column name in the final dataset
+            self.process_new_matches(
+                df=final_df,
+                name_column='Name',
+                min_score=min_score,
+                batch_size=batch_size
+            )
+            
+        except FileNotFoundError:
+            self.logger.error("Final deduplicated dataset not found at data/processed/final_deduplicated_dataset.csv")
+            raise
+        except Exception as e:
+            self.logger.error(f"Error processing matches from final deduplicated dataset: {e}")
+            raise
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)
+    
+    try:
+        # Initialize the match generator
+        generator = PotentialMatchGenerator()
+        
+        # Process matches from the final deduplicated dataset
+        logger.info("Starting to process matches from final deduplicated dataset...")
+        generator.process_new_matches_from_final_dedup()
+        logger.info("Completed processing matches from final deduplicated dataset")
+        
+    except Exception as e:
+        logger.error(f"Error running match generator: {e}")
+        raise
+

@@ -34,6 +34,12 @@ class HooDataProcessor(BaseDataProcessor):
         df.columns = df.columns.str.strip()
         logging.info(f"HOO data columns after stripping whitespace: {df.columns.tolist()}")
 
+        # Remove duplicate entries
+        df = df[~df['Agency Name'].str.strip().isin([
+            "Counsel to the Mayor, Office of",
+            "Public Schools,New York City"
+        ])]
+
         # Check raw duplicates
         raw_dupes = self.check_raw_duplicates(df, ['Agency Name'])
 

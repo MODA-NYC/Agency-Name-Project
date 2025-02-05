@@ -14,6 +14,7 @@ This project aims to produce a single, standardized, authoritative dataset of Ne
   - Established source-level normalization and merged datasets into a single intermediate dataset.
   - Successfully implemented source-specific name preservation in `merged_dataset.csv`.
   - Created centralized pipeline orchestration through `main.py`.
+  - Added NYC.gov agency list scraping script to gather additional agency information.
 - Challenges Discovered:
   - Certain data sources (e.g., HOO data) rely on multiple fields (Agency Name, HoO Title) to distinguish unique entities.
   - Using Agency Name alone leads to ambiguous merges and loss of detail.

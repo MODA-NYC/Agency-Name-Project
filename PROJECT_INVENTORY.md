@@ -67,6 +67,7 @@
 - `src/match_generator.py` - Match generation orchestrator
 - `src/apply_verified_matches.py` - Applies verified matches
 - `src/create_initial_release.py` - Generates initial release dataset by removing specified fields and filtering records
+- `src/scrape_nyc_gov_agency_list.py` - Scrapes agency information from NYC.gov website
 
 ## Data Files
 
@@ -76,6 +77,7 @@
 - `data/raw/WeGov Data.csv` - WeGov source data
 - `data/raw/ODA Data.csv` - ODA source data
 - `data/raw/CPO Data.csv` - CPO source data
+- `data/raw/nyc_gov_agency_list.csv` - Scraped agency information from NYC.gov
 
 ### Intermediate Data
 - `data/intermediate/merged_dataset.csv` - Combined dataset after merging

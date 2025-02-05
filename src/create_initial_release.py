@@ -3,6 +3,25 @@ import os
 import logging
 import pandas as pd
 import argparse
+from pathlib import Path
+
+def load_nyc_gov_descriptions(data_dir: str) -> pd.DataFrame:
+    """
+    Load the NYC.gov agency descriptions from the scraped data.
+    
+    Args:
+        data_dir (str): Base directory for data files
+        
+    Returns:
+        pd.DataFrame: DataFrame containing agency names and descriptions
+    """
+    descriptions_path = os.path.join(data_dir, 'raw', 'nyc_gov_agency_list.csv')
+    try:
+        df_desc = pd.read_csv(descriptions_path)
+        return df_desc[['Name - NYC.gov Agency List', 'Description-nyc.gov']]
+    except Exception as e:
+        logging.warning(f"Could not load NYC.gov descriptions from {descriptions_path}: {e}")
+        return pd.DataFrame(columns=['Name - NYC.gov Agency List', 'Description-nyc.gov'])
 
 def main(data_dir: str, input_filename: str, output_filename: str):
     # Set up logging
@@ -21,6 +40,30 @@ def main(data_dir: str, input_filename: str, output_filename: str):
     except Exception as e:
         logger.error(f"Failed to load dataset from {input_path}: {e}")
         raise
+
+    # Drop the original Description field
+    if 'Description' in df.columns:
+        df = df.drop('Description', axis=1)
+        logger.info("Dropped original Description field")
+
+    # Load NYC.gov descriptions
+    df_desc = load_nyc_gov_descriptions(data_dir)
+    if not df_desc.empty:
+        logger.info(f"Loaded {len(df_desc)} NYC.gov descriptions")
+        
+        # Merge descriptions based on Name - NYC.gov Agency List
+        # Use left merge to keep all records from main dataset
+        df = pd.merge(
+            df,
+            df_desc,
+            on='Name - NYC.gov Agency List',
+            how='left'
+        )
+        logger.info(f"Merged in {df['Description-nyc.gov'].notna().sum()} NYC.gov descriptions")
+        
+        # Rename Description-nyc.gov to Description
+        df = df.rename(columns={'Description-nyc.gov': 'Description'})
+        logger.info("Renamed Description-nyc.gov field to Description")
 
     # Filter out records based on OperationalStatus and PreliminaryOrganizationType
     if 'OperationalStatus' in df.columns:
@@ -74,6 +117,10 @@ def main(data_dir: str, input_filename: str, output_filename: str):
     try:
         df.to_csv(output_path, index=False)
         logger.info(f"Saved initial release dataset with {len(df)} records to {output_path}")
+        
+        # Log description statistics
+        desc_count = df['Description'].notna().sum()
+        logger.info(f"Final dataset has {desc_count} records with descriptions ({desc_count/len(df)*100:.1f}%)")
     except Exception as e:
         logger.error(f"Failed to save dataset to {output_path}: {e}")
         raise

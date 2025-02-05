@@ -66,6 +66,7 @@
 - `src/add_manual_matches.py` - Manual match addition utility
 - `src/match_generator.py` - Match generation orchestrator
 - `src/apply_verified_matches.py` - Applies verified matches
+- `src/create_initial_release.py` - Generates initial release dataset by removing specified fields and filtering records
 
 ## Data Files
 

@@ -1,36 +1,33 @@
 ﻿Agency Acronym,Agency Name,Entity type,MMR chapter,Rulemaking Entity,Agency Head First Name,Agency Head Last Name,Reports to Deputy Mayor/Executive,Agency/Board Website
-CA,Chief Advisor to the Mayor,Executive,,,Ingrid,Lewis-Martin,Mayor,
+CA,Chief Advisor to the Mayor,Executive,,,,,Mayor,
 COS,Mayor's Chief of Staff,Executive,,,Camille,Varlack,Mayor's Chief of Staff,
-COUNSEL,Counsel to the Mayor,Executive,,,Lisa,Zornberg,Chief Counsel to the Mayor,https://www1.nyc.gov/site/counseltothemayor/index.page
-DM HEWD,Deputy Mayor of Housing Economic & Workforce Development,Executive,,,Maria,Torres-Springer,First Deputy Mayor,
+COUNSEL,Counsel to the Mayor,Executive,,,Allison,Stoddart,Chief Counsel to the Mayor,https://www1.nyc.gov/site/counseltothemayor/index.page
+DM HEWD,Deputy Mayor of Housing Economic & Workforce Development,Executive,,,,,First Deputy Mayor,
 DM HHS,Deputy Mayor of Health & Human Services,Executive,,,Anne,Williams-Isom,First Deputy Mayor,
 DM OPS,Deputy Mayor of Operations,Executive,,,Meera,Joshi,First Deputy Mayor,
-DM PS,Deputy Mayor of Public Safety,Executive,,,Phillip,Banks,Mayor,
+DM PS,Deputy Mayor of Public Safety,Executive,,,Chauncey,Parker,Mayor,
 DM SI,Deputy Mayor of Strategic Initiatives,Executive,,,Ana,Almanzar,First Deputy Mayor,
-FDM,First Deputy Mayor,Executive,,,Sheena,Wright,First Deputy Mayor,
+FDM,First Deputy Mayor,Executive,,,Maria,Torres-Springer,First Deputy Mayor,
 MAYOR,Mayor's Office,Executive,,checked,Gladys,Miranda,Mayor's Chief of Staff,https://www1.nyc.gov/office-of-the-mayor/index.page
 ADVANCE,Mayor's Advance Team,Mayoral unit/office,,,Robert,Bucknam III,Mayor's Chief of Staff,
 CAU,Community Affairs Unit,Mayoral unit/office,,checked,Fred,Kreizman,Mayor's Chief of Staff,https://www1.nyc.gov/site/cau/index.page?msclkid=de949502bc0b11ecb5fea6d85cf7f001
 CCO,Chief Climate Officer,Mayoral unit/office,,,Rohit,Aggarwala,DM Operations,
 CECM,Mayor's Office of Citywide Events Coordination & Management,Mayoral unit/office,,checked,Dawn,Tolson,Mayor's Chief of Staff,https://www1.nyc.gov/site/cecm/index.page
 CEO,Chief Efficiency Officer,Mayoral unit/office,,,Denise,Clay,First Deputy Mayor,
-CGE,Commission on Gender Equity,Mayoral unit/office,,,,,DM Strategic Initiatives,https://www.nyc.gov/site/genderequity/index.page
 CIDI,Center for Innovation through Data Intelligence,Mayoral unit/office,,,MaryAnne,Schretzman,DM Strategic Initiatives,https://www1.nyc.gov/site/cidi/about/about.page
 COMMS,Director of Communications,Mayoral unit/office,,,Fabien,Levy,DM Communications,
 CPD,Office of Capital Project Development,Mayoral unit/office,,,,,DM Operations,
-CRE,Commission on Racial Equity,Mayoral unit/office,,,Linda,Tigani,DM Strategic Initiatives,
 CREATIVECOMMS,Creative Communications,Mayoral unit/office,,,Michael,Appleton,DM Communications,
 DEMOCRACYNYC,DemocracyNYC,Mayoral unit/office,,,,,DM Strategic Initiatives,
 EMERGINGMKTS,Office of Emerging Markets,Mayoral unit/office,,,,,Mayor's Chief of Staff,
-ENDGBV,Mayor’s Office to End Domestic and Gender-Based Violence,Mayoral unit/office,,,Saloni,Sethi,DM Health & Human Services,https://www1.nyc.gov/site/ocdv/index.page
 ENGAGEMENT,Office of Engagement,Mayoral unit/office,,,,,Mayor's Chief of Staff,
 GMC,Gracie Mansion Conservancy,Mayoral unit/office,,,Melissa,Gonzalez,Mayor's Chief of Staff,https://www.graciemansion.org/gracie-mansion-conservancy/
 HRO,Housing Recovery Office,Mayoral unit/office,,checked,Rudy,Giuliani,DM Housing - Economic Development & Workforce,https://www1.nyc.gov/site/housingrecovery/index.page
 IA,Mayor's Office for International Affairs,Mayoral unit/office,,,Edward,Mermelstein,Mayor's Chief of Staff,https://www1.nyc.gov/site/international/index.page
-IGA,Intergovernmental Affairs,Mayoral unit/office,,,Tiffany,Raspberry,Mayor's Chief of Staff,https://www1.nyc.gov/site/intergovernmental/index.page
-IGA - CLA,Intergovernmental Affairs - City Legislative Affairs,Mayoral unit/office,,,Connor,Martinez,Mayor's Chief of Staff,https://www1.nyc.gov/site/intergovernmental/city/city-legislative-affairs.page
-IGA - FLA,Intergovernmental Affairs - Federal Legislative Affairs,Mayoral unit/office,,,,,Mayor's Chief of Staff,https://www1.nyc.gov/site/intergovernmental/federal/federal-legislative-affairs.page
-IGA - SLA,Intergovernmental Affairs - State Legislative Affairs,Mayoral unit/office,,,Ellis ,Christopher,Mayor's Chief of Staff,https://www1.nyc.gov/site/intergovernmental/state/state-legislative-affairs.page
+IGA,Intergovernmental Affairs,Mayoral unit/office,,,Tiffany,Raspberry,"Mayor's Chief of Staff,DM Intergovernmental Affairs",https://www1.nyc.gov/site/intergovernmental/index.page
+IGA - CLA,Intergovernmental Affairs - City Legislative Affairs,Mayoral unit/office,,,Connor,Martinez,"Mayor's Chief of Staff,DM Intergovernmental Affairs",https://www1.nyc.gov/site/intergovernmental/city/city-legislative-affairs.page
+IGA - FLA,Intergovernmental Affairs - Federal Legislative Affairs,Mayoral unit/office,,,,,"Mayor's Chief of Staff,DM Intergovernmental Affairs",https://www1.nyc.gov/site/intergovernmental/federal/federal-legislative-affairs.page
+IGA - SLA,Intergovernmental Affairs - State Legislative Affairs,Mayoral unit/office,,,Ellis ,Christopher,"Mayor's Chief of Staff,DM Intergovernmental Affairs",https://www1.nyc.gov/site/intergovernmental/state/state-legislative-affairs.page
 MAYORS FUND,Mayor's Fund to Advance NYC,Mayoral unit/office,,,,,DM Strategic Initiatives,https://www1.nyc.gov/site/fund/about/about.page 
 MOA,Mayor's Office of Appointments,Mayoral unit/office,,,Lisa,Lashley,Chief Advisor to the Mayor,https://www1.nyc.gov/site/appointments/about/about.page
 MOAS,Mayor's Office of Administrative Services,Mayoral unit/office,,,Mir,Bashar,Chief Advisor to the Mayor,
@@ -44,13 +41,13 @@ MOERJ,Mayor's Office of Equity & Racial Justice,Mayoral unit/office,,,Sideya,She
 MOFP,Mayor's Office of Food Policy,Mayoral unit/office,,,Kate,MacKenzie ,DM Strategic Initiatives,https://www1.nyc.gov/site/foodpolicy/index.page?msclkid=86792869bc1b11ecad2c450a461c6bd1
 MOIA,Mayor's Office of Immigrant Affairs,Mayoral unit/office,,,Manuel,Castro ,DM Health & Human Services,https://www1.nyc.gov/site/immigrants/index.page
 MOME,Mayor's Office of Media and Entertainment,Mayoral unit/office,,checked,Patricia,Kaufman,DM Housing - Economic Development & Workforce,https://www1.nyc.gov/site/mome/index.page
-MONS,Mayor's Office for Nonprofit Services,Mayoral unit/office,,,Karen,Ford,DM Strategic Initiatives,
+MONS,Mayor's Office for Nonprofit Services,Mayoral unit/office,,,,,DM Strategic Initiatives,
 MOPD,Mayor's Office for People with Disabilities,Mayoral unit/office,,,Christina,Curry,Chief Counsel to the Mayor,https://www1.nyc.gov/site/mopd/index.page
 MOPGV,Mayor's Office to Prevent Gun Violence,Mayoral unit/office,,,,,DM Public Safety,https://www1.nyc.gov/site/peacenyc/index.page
 MOPI,Mayor's Office of Pensions and Investments,Mayoral unit/office,,,,,First Deputy Mayor,
 MOPP,Mayor's Office of Policy and Planning,Mayoral unit/office,,,Betsy,MacClean,First Deputy Mayor,
 MOPT,Mayor's Office to Protect Tenants,Mayoral unit/office,,,,,DM Housing - Economic Development & Workforce,https://www1.nyc.gov/content/tenantprotection/pages/
-MORMC,Mayor's Office Risk Management & Compliance,Mayoral unit/office,,,,,Chief Counsel to the Mayor,
+MORMC,Mayor's Office Risk Management & Compliance,Mayoral unit/office,,,Jean-Claude,LeBec,Chief Counsel to the Mayor,
 MOSPCE,Mayor's Office of Special Projects and Community Events,Mayoral unit/office,,,Trey,Moynihan,Mayor's Chief of Staff,https://www1.nyc.gov/site/mospce/index.page
 MOUA,Mayor's Office of Urban Agriculture,Mayoral unit/office,,,Qiana ,Mickie,DM Operations,https://www.nyc.gov/site/agriculture/index.page
 MOYE,Mayor’s Office of Youth Employment,Mayoral unit/office,,,,,DM Strategic Initiatives,https://www1.nyc.gov/site/youthemployment/index.page
@@ -82,13 +79,12 @@ SWR,Mayor's Office of Sports and Recreation,Mayoral unit/office,,,Jasmine,Ray,Ma
 UNITY,The Unity Project,Mayoral unit/office,,,,,DM Health & Human Services,https://growingupnyc.cityofnewyork.us/generationnyc/lgbtq-coronavirus-resources/
 UTILITYADV,MO of Utility Advocate,Mayoral unit/office,,,,,,
 YMI,Young Men's Initiative,Mayoral unit/office,,,,,DM Strategic Initiatives,"https://www1.nyc.gov/site/ymi/about/about.page#:~:text=In%20August%202011%2C%20New%20York%20City%20Young%20Men%E2%80%99s,and%2024%20in%20education%2C%20employment%2C%20health%20and%20justice."
+ENDGBV,Mayor’s Office to End Domestic and Gender-Based Violence,"Mayoral unit/office,Board/Commission",,,Saloni,Sethi,DM Health & Human Services,https://www1.nyc.gov/site/ocdv/index.page
 311,311,Agency,checked,,,,Chief Technology Officer,
 ACS,Administration for Children's Services,Agency,checked,checked,Jess,Dannhauser,DM Health & Human Services,https://www1.nyc.gov/site/acs/index.page
 AJC,Office of Administrative Justice Coordinator,Agency,,,,,Chief Counsel to the Mayor,https://www1.nyc.gov/site/ajc/about/about.page
-CCRB,Civilian Complaint Review Board ,Agency,checked,checked,,,Chief Counsel to the Mayor,https://www1.nyc.gov/site/ccrb/index.page?msclkid=8b3bf071bc0d11ecb2c27a7c1bb56f25
-CHANCELLOR,Chancellor,Agency,,,David,Banks,Mayor,
-CHILDRENS CABINET,New York City Children's Cabinet ,Agency,,,Ahsia,Badi,DM Strategic Initiatives,https://www1.nyc.gov/site/childrenscabinet/index.page?msclkid=da315577bc0d11ecb9cfda6d9d498f68
-DCAS,Department of Citywide Administrative Services,Agency,checked,checked,Louis,Molina,First Deputy Mayor,https://www1.nyc.gov/site/dcas/index.page?msclkid=2c5de524bc0f11ecae92f5cb2acc9038
+CHANCELLOR,Chancellor,Agency,,,Melissa,Aviles Ramos,Mayor,
+DCAS,Department of Citywide Administrative Services,Agency,checked,checked,Louis,Molina,"First Deputy Mayor,DM Administration",https://www1.nyc.gov/site/dcas/index.page?msclkid=2c5de524bc0f11ecae92f5cb2acc9038
 DCLA,Department of Cultural Affairs,Agency,checked,checked,Laurie,Cumbo,DM Housing - Economic Development & Workforce,https://www1.nyc.gov/site/dcla/index.page?msclkid=4ad8eea6bc0f11eca8b4d710ea582bf2
 DCP,Department of City Planning,Agency,checked,checked,Daniel,Garodnick,DM Housing - Economic Development & Workforce,https://www1.nyc.gov/site/planning/index.page?msclkid=57161607bc0f11ec86474651d34e7657
 DCWP,Department of Consumer and Worker Protection,Agency,checked,checked,Vilda Vera,Mayuga,DM Housing - Economic Development & Workforce,https://www1.nyc.gov/site/dca/index.page?msclkid=8dc1dcffbc0f11ec9ecea73b54fbb421
@@ -97,33 +93,32 @@ DEP,Department of Environment Protection,Agency,checked,checked,Rohit,Aggarwala,
 DFTA,Department for the Aging,Agency,checked,checked,Lorraine,Cortes-Vazquez,DM Health & Human Services,https://www1.nyc.gov/site/dfta/index.page?msclkid=c835e055bc0f11ec89b942fdac112259
 DOB,Department of Buildings,Agency,checked,checked,Jimmy,Oddo,DM Operations,https://www1.nyc.gov/site/buildings/index.page?msclkid=e5ba3849bc0f11ecbb981aeb3ef7d028
 DOC,Department of Correction,Agency,checked,checked,Lynelle,Maginley-Liddie,DM Public Safety,https://www1.nyc.gov/site/doc/index.page?msclkid=f6213713bc0f11ecb61ddcdd0cbda570
-DOE,Department of Education,Agency,checked,,David,Banks,Chancellor,https://www.schools.nyc.gov/
 DOF,Department of Finance,Agency,checked,checked,Preston,Niblack,First Deputy Mayor,https://www1.nyc.gov/site/finance/index.page?msclkid=02c610e7bc1011ec8b6ae4faf3d645d4
-DOHMH,Department of Health and Mental Hygiene,Agency,checked,checked,Ashwin,Vasan,DM Health & Human Services,https://www1.nyc.gov/site/doh/about/about-doh.page?msclkid=121fb7bcbc1011eca35b6d14d34d006d
+DOHMH,Department of Health and Mental Hygiene,Agency,checked,checked,Michelle,Morse,DM Health & Human Services,https://www1.nyc.gov/site/doh/about/about-doh.page?msclkid=121fb7bcbc1011eca35b6d14d34d006d
 DOI,Department of Investigation,Agency,checked,,Jocelyn,Strauber,Mayor,https://www1.nyc.gov/site/doi/index.page?msclkid=1dbe624ebc1011ec95f88fe59389542c
 DOP,Department of Probation,Agency,checked,checked,Juanita,Holmes,DM Public Safety,https://www1.nyc.gov/site/probation/index.page?msclkid=43ec00a0bc1011ecba5820c62ea2e1bd
 DORIS,Department of Records & Information Service,Agency,checked,checked,Pauline,Toole,Chief Counsel to the Mayor,https://www1.nyc.gov/site/records/index.page?msclkid=511b3371bc1011ec867f42f8fe44105e
 DOT,Department of Transportation,Agency,checked,checked,Ydanis,Rodriguez,DM Operations,https://www.transportation.gov/?msclkid=5d02b320bc1011ec871cfb7ecbb9bd63
 DPR,Department of Parks & Recreation,Agency,checked,checked,Sue,Donoghue,DM Operations,https://www.nycgovparks.org/
-DSNY,Department of Sanitation,Agency,checked,checked,Jessica,Tisch,DM Operations,https://www1.nyc.gov/assets/dsny/site/home
+DSNY,Department of Sanitation,Agency,checked,checked,,,DM Operations,https://www1.nyc.gov/assets/dsny/site/home
 DSS,Department of Social Services,Agency,checked,checked,Molly,Park ,DM Health & Human Services,https://www1.nyc.gov/site/dss/index.page?msclkid=903e8ea3bc1011ec8b98828a0cf907b6
 DSS - DHS,Department of Social Services - Department of Homeless Services,Agency,checked,checked,Joslyn,Carter,DM Health & Human Services,https://www1.nyc.gov/site/dhs/index.page?msclkid=d091d8a9bc0f11ec9bec30e4e4c00ad5
 DSS - HRA,Department of Social Services - Human Resources Administration,Agency,checked,checked,Scott,French,DM Health & Human Services,https://www1.nyc.gov/site/hra/about/about-hra.page
 DVS,Department of Veteran's Services,Agency,checked,,James,Hendon,DM Health & Human Services,https://www1.nyc.gov/site/veterans/index.page?msclkid=b763efa6bc1011ecb9447ad66b35c528
 DYCD,Department of Youth & Community Development,Agency,checked,,Keith,Howard,DM Strategic Initiatives,https://www1.nyc.gov/site/dycd/index.page?msclkid=c24b2fd1bc1011eca7ba8ad2c750e62a
 EDC,Economic Development Corporation,Agency,checked,,Andrew,Kimball,DM Housing - Economic Development & Workforce,https://edc.nyc/meet-nycedc
-FDNY,Fire Department,Agency,checked,checked,,,DM Public Safety,https://www1.nyc.gov/site/fdny/index.page?msclkid=fc516d51bc1211ec89ba12b9d1c551c3
+FDNY,Fire Department,Agency,checked,checked,Robert,Tucker,DM Public Safety,https://www1.nyc.gov/site/fdny/index.page?msclkid=fc516d51bc1211ec89ba12b9d1c551c3
 FILM,"Office of Film, Theatre, & Broadcasting",Agency,,checked,,,DM Housing - Economic Development & Workforce,http://www.nyc.gov/html/film////////////html/news_2009/060109_green_moftb_initiatives.shtml?msclkid=27e93e27bc1b11ec85cc154237ef491a
-FISA,Financial Information Services Agency,Agency,,,,,Comptroller,https://www1.nyc.gov/site/eepc/about/jurisdictions/fisa.page?msclkid=4d30ffbbbc1b11ecb9e3fd0450c3bf7a
 FUNDPUBLICSCHOOLS,Fund for Public Schools,Agency,,,,,Chancellor,https://www.fundforpublicschools.org/mission
 H+H,NYC Health + Hospitals,Agency,checked,,Mitchell ,Katz,DM Health & Human Services,https://www.nychealthandhospitals.org/about-nyc-health-hospitals/
 HPD,Housing Preservation & Development,Agency,checked,checked,Adolfo,Carrion Jr.,DM Housing - Economic Development & Workforce,https://www1.nyc.gov/site/hpd/index.page
-LAW,Law Department,Agency,checked,checked,,,"Corporation Counsel,Mayor,First Deputy Mayor",https://www1.nyc.gov/site/law/index.page
+LAW,Law Department,Agency,checked,checked,Muriel,Goode-Trufant,"Corporation Counsel,Mayor,First Deputy Mayor",https://www1.nyc.gov/site/law/index.page
 NYCEM,NYC Emergency Management,Agency,checked,checked,Zach,Iscol,DM Public Safety,https://www1.nyc.gov/site/em/about/overview.page
 NYCGO,NYC & Company,Agency,,,Nancy,Mammana,DM Housing - Economic Development & Workforce,https://business.nycgo.com/about-us/who-we-are/
 NYCHA,NYC Housing Authority,Agency,checked,,Lisa,Bova-Hiatt,DM Housing - Economic Development & Workforce,https://www1.nyc.gov/site/nycha/index.page
 NYCOA,Office of the Actuary,Agency,,,,,DM Operations,https://www1.nyc.gov/site/actuary/about/about-the-office-of-the-actuary.page 
-NYPD,Police Department,Agency,checked,checked,Edward,Caban,Mayor,https://www1.nyc.gov/site/nypd/index.page
+NYCPS,Department of Education,Agency,checked,checked,Melissa,Aviles Ramos,Chancellor,https://www.schools.nyc.gov/
+NYPD,Police Department,Agency,checked,checked,Jessica,Tisch,Mayor,https://www1.nyc.gov/site/nypd/index.page
 OATA,Office of Administrative Tax Appeals,Agency,,checked,,,,https://www1.nyc.gov/site/oata/index.page
 OATH,Office of Administrative Trials and Hearings,Agency,checked,checked,Asim,Rehman,Chief Counsel to the Mayor,https://www1.nyc.gov/site/oath/index.page
 OCME,Office of the Chief Medical Examiner,Agency,checked,,Jason,Graham,DM Health & Human Services,https://www1.nyc.gov/site/ocme/index.page
@@ -136,6 +131,14 @@ SBS,Department of Small Business Services,Agency,checked,checked,Dynishal,Gross,
 SCA,School Construction Authority,Agency,checked,,Nina,Kubota,DM Operations,http://www.nycsca.org/
 SHERIFF,Sheriff,Agency,,,Anthony,Miranda,First Deputy Mayor,
 SNP,NYC Office of the Special Narcotics Prosecutor,Agency,,,,,DM Public Safety,https://www.snpnyc.org/organization/
+CCRB,Civilian Complaint Review Board ,"Agency,Board/Commission",checked,checked,,,Chief Counsel to the Mayor,https://www1.nyc.gov/site/ccrb/index.page?msclkid=8b3bf071bc0d11ecb2c27a7c1bb56f25
+CGE,Commission on Gender Equity,"Board/Commission,Agency",,,,,DM Strategic Initiatives,https://www1.nyc.gov/site/genderequity/index.page?msclkid=d039ef1fbc0d11eca67c346962b000e0
+CHILDRENS CABINET,New York City Children's Cabinet ,"Agency,Board/Commission",,,Ahsia,Badi,DM Strategic Initiatives,https://www1.nyc.gov/site/childrenscabinet/index.page?msclkid=da315577bc0d11ecb9cfda6d9d498f68
+CRE,Commission on Racial Equity,"Agency,Board/Commission",,,Linda,Tigani,DM Strategic Initiatives,
+FISA,Financial Information Services Agency,"Agency,Board/Commission",,,,,"Comptroller,First Deputy Mayor",https://www1.nyc.gov/site/eepc/about/jurisdictions/fisa.page?msclkid=4d30ffbbbc1b11ecb9e3fd0450c3bf7a
+HDC,Housing Development Corporation,"Board/Commission,Agency",,,Eric,Enderlin,DM Housing - Economic Development & Workforce,https://www.nychdc.com/
+LPC,Landmarks Preservation Commission,"Board/Commission,Agency",checked,checked,Lisa,Kersavage,DM Housing - Economic Development & Workforce,https://www1.nyc.gov/site/lpc/index.page
+PDC,Public Design Commission,"Board/Commission,Agency",,checked,Sreoshy,Banerjea,DM Housing - Economic Development & Workforce,https://www1.nyc.gov/site/designcommission/index.page
 TLC,Taxi & Limousine Commission,"Agency,Board/Commission",checked,checked,David ,Do,DM Operations,https://www1.nyc.gov/site/tlc/index.page
 AAC,Algorithm Advisory Committee,Board/Commission,,,,,First Deputy Mayor,https://www1.nyc.gov/site/ampo/committees/advisory-committee.page 
 AACRHMTF,Task Force on African American Civil Rights History Museum ,Board/Commission,,,,,DM Housing - Economic Development & Workforce,
@@ -165,7 +168,7 @@ BCM,CIG - Brooklyn Children's Museum,Board/Commission,,,,,DM Housing - Economic 
 BHS,Center for Brooklyn History (formerly known Brooklyn Historical Society),Board/Commission,,,,,DM Housing - Economic Development & Workforce,https://www.bklynlibrary.org/cbh/about/history
 BIC,Business Integrity Commission,Board/Commission,checked,checked,Elizabeth ,Crotty,Chief Counsel to the Mayor,https://www1.nyc.gov/site/bic/index.page?msclkid=320d5a7dbc0911ec9e20daa9001f7a61
 BMTTF,Brooklyn Marine Terminal Task Force,Board/Commission,,,,,DM Housing - Economic Development & Workforce,
-BNYDC,Brooklyn Navy Yard Development Corporation,Board/Commission,,,,,DM Housing - Economic Development & Workforce,https://brooklynnavyyard.org/about/mission
+BNYDC,Brooklyn Navy Yard Development Corporation,Board/Commission,,,Lindsay,Greene,DM Housing - Economic Development & Workforce,https://brooklynnavyyard.org/about/mission
 BOC,Board of Correction,Board/Commission,,checked,,,DM Public Safety,https://www1.nyc.gov/site/boc/index.page?msclkid=e4172a96bc0911eca50ee179acb80b68
 BOH,Board of Health,Board/Commission,,,,,DM Health & Human Services,https://www1.nyc.gov/site/doh/about/about-doh/board-of-health.page?msclkid=7ac82b3fbc0a11ec826dd7bcf2e4ff5e
 BPL,Brooklyn Public Library Board of Trustees,Board/Commission,checked,,,,DM Housing - Economic Development & Workforce,
@@ -194,14 +197,12 @@ CEC,Civic Engagement Commission,Board/Commission,,checked,Sarah,Sayeed,Mayor's C
 CENTRALPARK,Central Park Conservancy,Board/Commission,,,,,DM Operations,https://www.centralparknyc.org/
 CFB,Campaign Finance Board,Board/Commission,,checked,,,Mayor's Chief of Staff,http://nyccfb.info/?msclkid=b1ef9b86bc0d11eca5848467232bb23f
 CFRAT,Child Fatality Review Advisory Team,Board/Commission,,,,,DM Health & Human Services,
-CGE,Commission on Gender Equity,Board/Commission,,,,,DM Strategic Initiatives,https://www1.nyc.gov/site/genderequity/index.page?msclkid=d039ef1fbc0d11eca67c346962b000e0
 CIRSBOARD,Cultural Institutions Retirement System - Board of Trustees,Board/Commission,,,,,First Deputy Mayor,https://cirsplans.org/about/ 
 CMAB,Climate Mobilization Advisory Board,Board/Commission,,,,,DM Operations,
 COIB,Conflicts of Interest Board,Board/Commission,,checked,,,Chief Counsel to the Mayor,https://www1.nyc.gov/site/coib/about/about-coib.page?msclkid=0c70b30cbc0e11ec98f24ac74f4cd007
 COPIC,Commission on Public Information and Communication,Board/Commission,,,,,Chief Counsel to the Mayor,https://council.nyc.gov/public-advocate/copic/?msclkid=1d42ea34bc0e11ecb5e410c72c9d2b55
 CPC,City Planning Commission,Board/Commission,,,,,DM Housing - Economic Development & Workforce,https://www1.nyc.gov/site/planning/about/commission.page?msclkid=33c58625bc0e11ec964135027bf3f186
 CRC,Charter Revision Commission,Board/Commission,,,,,DM Strategic Initiatives,https://www1.nyc.gov/site/charter/index.page?msclkid=42ae3a70bc0e11ec96e569cff3a903b9
-CRE,Commission on Racial Equity,Board/Commission,,,,,DM Strategic Initiatives,
 CSB,Community Services Board (formerly known as Mental Hygiene Advisory Board),Board/Commission,,,,,DM Health & Human Services,https://www3.erie.gov/mentalhealth/community-services-board-and-subcommittees?msclkid=67c35d80bc0e11ec9b403c1fb160ad81
 CSBDDS,Community Services Board - Developmental Disabilities Subcommittee,Board/Commission,,,,,DM Health & Human Services,https://www3.erie.gov/mentalhealth/community-services-board-and-subcommittees?msclkid=67c35d80bc0e11ec9b403c1fb160ad81
 CSBMHS,Community Services Board - Mental Health Subcommittee,Board/Commission,,,,,DM Health & Human Services,https://www3.erie.gov/mentalhealth/community-services-board-and-subcommittees?msclkid=67c35d80bc0e11ec9b403c1fb160ad81
@@ -228,7 +229,6 @@ EEPC,Equal Employment Practices Commission,Board/Commission,,,,,Chief Counsel to
 EJAB,Environmental Justice Advisory Board,Board/Commission,,,,,DM Operations,https://www1.nyc.gov/site/sustainability/our-programs/environmental-justice.page?msclkid=4ddaf658bc1211ecb039e1c5f56ffd49
 FCRC,Franchise and Concession Review Committee,Board/Commission,,checked,,,Chief Counsel to the Mayor,https://www1.nyc.gov/site/mocs/reporting/about-franchises-concessions.page?msclkid=a8455f93bc1211ecb45662448276c5a0
 FDNYPENSION,FDNY Department Pension Fund,Board/Commission,,,,,First Deputy Mayor,
-FISA,Financial Information Services Agency,Board/Commission,,,,,First Deputy Mayor,
 FITBOARD,Fashion Institute of Technology - Board of Trustees,Board/Commission,,,,,Mayor's Chief of Staff,
 FLUSHINGARTS,CIG - Flushing Council on Culture and the Arts / Flushing Town Hall,Board/Commission,,,,,DM Housing - Economic Development & Workforce,https://www.flushingtownhall.org/board
 FMCPA,Flushing Meadows Corona Park Alliance,Board/Commission,,,,,DM Operations,
@@ -245,7 +245,6 @@ GROWNYC,GrowNYC (previously Council on the Environment),Board/Commission,,,,,DM 
 GSBAB,Get Stuff Built Advisory Board,Board/Commission,,,,,First Deputy Mayor,chrome-extension://efaidnbmnnnibpcajpcglclefindmkaj/https://www.nyc.gov/assets/home/downloads/pdf/press-releases/2022/GetStuffBuilt.pdf
 HANDSCHU,Handschu Committee,Board/Commission,,,,,Chief Counsel to the Mayor,
 HASA,HIV/AIDS Services Advisory Board,Board/Commission,,,,,DM Health & Human Services,https://www1.nyc.gov/site/hra/help/hiv-aids-services.page?msclkid=bb6d4474ac6411eca62ebbd4bdbcdbdc 
-HDC,Housing Development Corporation,Board/Commission,,,Eric,Enderlin,DM Housing - Economic Development & Workforce,https://www.nychdc.com/
 HHCBOARD,Health and Hospitals Corporation Board of Directors,Board/Commission,,,,,DM Health & Human Services,https://www.nychealthandhospitals.org/about-nyc-health-hospitals/
 HHCPRB,Health and Hospitals Corporation Personnel Review Board,Board/Commission,,,,,DM Health & Human Services,https://www.nychealthandhospitals.org/about-nyc-health-hospitals/
 HIVPC,HIV Planning Council,Board/Commission,,,,,DM Health & Human Services,https://nyhiv.org/
@@ -268,7 +267,6 @@ LDC,Land Development Corporation,Board/Commission,,,,,DM Housing - Economic Deve
 LINCOLNCENTER,CIG - Lincoln Center for the Performing Arts,Board/Commission,,,,,DM Housing - Economic Development & Workforce,http://www.aboutlincolncenter.org/about/board-of-directors
 LMDC,Lower Manhattan Development Corporation,Board/Commission,,,,,DM Housing - Economic Development & Workforce,http://www.renewnyc.com/overlay/AboutUs/ 
 LOFT,Loft Board,Board/Commission,,checked,,,DM Operations,https://www1.nyc.gov/site/loftboard/index.page
-LPC,Landmarks Preservation Commission,Board/Commission,checked,checked,Lisa,Kersavage,DM Housing - Economic Development & Workforce,https://www1.nyc.gov/site/lpc/index.page
 MACJ,Mayor's Advisory Committee on the Judiciary,Board/Commission,,,,,Chief Counsel to the Mayor,https://www1.nyc.gov/site/macj/index.page
 MAYORSFUNDADV,Mayor's Fund Board of Advisors,Board/Commission,,,,,DM Strategic Initiatives,https://www1.nyc.gov/site/fund/about/board-of-advisors.page
 MAYORSFUNDBOARD,Mayor's Fund Board of Directors,Board/Commission,,,,,DM Strategic Initiatives,https://www1.nyc.gov/site/fund/about/board-of-directors.page
@@ -315,7 +313,6 @@ OCTF,Office Conversions Task Force,Board/Commission,,,,,DM Housing - Economic De
 OPABOARD,Office of Payroll Administration Board,Board/Commission,,,,,First Deputy Mayor,https://www1.nyc.gov/site/opa/index.page
 OSFAB,Opioid Settlement Fund Advisory Board,Board/Commission,,,,,DM Health & Human Services,
 PCDC,Primary Care Development Corporation,Board/Commission,,,,,DM Health & Human Services,https://www.pcdc.org/new-york-city/
-PDC,Public Design Commission,Board/Commission,,checked,Sreoshy,Banerjea,DM Housing - Economic Development & Workforce,https://www1.nyc.gov/site/designcommission/index.page
 PEP,Panel on Educational Policy,Board/Commission,,,,,Mayor's Chief of Staff,https://www.schools.nyc.gov/about-us/leadership/panel-for-education-policy
 PPB,Procurement Policy Board,Board/Commission,,checked,,,Chief Counsel to the Mayor,https://www1.nyc.gov/site/mocs/legal-forms/about-procurement-policy-board-ppb.page
 "PRIFGG, Inc.","Public Realm Improvement Fund Governing Group, Inc.",Board/Commission,,,,,DM Housing - Economic Development & Workforce,
@@ -342,10 +339,10 @@ SAB,Sustainability Advisory Board (Formerly OneNYC),Board/Commission,,,,,DM Oper
 SAC,Senior Advisory Council,Board/Commission,,,,,DM Health & Human Services,https://www1.nyc.gov/site/dfta/about/advisory-council.page
 SANDYTF,Hurricane Sandy Charitable Organizations and Houses of Worship Recovery Taskforce,Board/Commission,,,,,,
 SBAC,Small Business Advisory Commission,Board/Commission,,,,,DM Housing - Economic Development & Workforce,
-SCA,School Construction Authority- Board of Trustees,Board/Commission,,,,,DM Operations,
+SCA,School Construction Authority - Board of Trustees,Board/Commission,,,,,DM Operations,
 SCINYCSD,Special Commissioner of Investigation for the NYC School District,Board/Commission,,,,,,https://nycsci.org/
-SETF,Sexual Health Education Task Force,Board/Commission,,,,,DM Strategic Initiatives,https://www1.nyc.gov/site/genderequity/health/sexual-health-ed-task-force.page
 SFPBCC,State Fire Prevention and Building Code Council,Board/Commission,,,,,DM Operations,https://dos.ny.gov/state-fire-prevention-and-building-code-council/
+SHETF,Sexual Health Education Task Force,Board/Commission,,,,,DM Strategic Initiatives,https://www1.nyc.gov/site/genderequity/health/sexual-health-ed-task-force.page
 SHPAB,Street Harassment Prevention Advisory Board,Board/Commission,,,,,DM Health & Human Services,
 SICM,CIG - Staten Island Children’s Museum,Board/Commission,,,,,DM Housing - Economic Development & Workforce,https://www.sichildrensmuseum.org/staff-and-board-listings/
 SIHS,CIG - Staten Island Historical Society,Board/Commission,,,,,DM Housing - Economic Development & Workforce,https://www.historicrichmondtown.org/boardofdirectors

@@ -10,8 +10,6 @@ from matching.matcher import AgencyMatcher
 from analysis.quality_checker import DataQualityChecker
 from data_merging import merge_dataframes, clean_merged_data, track_data_provenance, ensure_record_ids
 from preprocessing.global_normalization import apply_global_normalization
-
-# Import the apply_matches function from its module.
 from apply_matches import apply_matches
 
 def validate_dataframe_columns(df: pd.DataFrame, required_cols: List[str], df_name: str) -> None:
@@ -154,7 +152,85 @@ def apply_manual_overrides(final_df: pd.DataFrame) -> pd.DataFrame:
             logging.info(f"Applied override for '{current_name}': set Name to '{override['Name']}' and Acronym to '{override['Acronym']}'")
     return final_df
 
-def main(data_dir: str, log_level: str, display: bool, save: bool, apply_matches_flag: bool):
+def final_cleanup(final_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Perform final cleanup of the deduplicated dataset.
+    
+    Steps:
+    1. Remove unwanted columns
+    2. Add OPS data with deduplication
+    3. Add HOO data with deduplication
+    4. Add NYC.gov Agency List data with deduplication
+    5. Drop temporary join key columns
+    """
+    # Step 1: Remove unwanted columns
+    cols_to_remove = [
+        "PrincipalOfficerGivenName", "PrincipalOfficerFamilyName",
+        "Agency Name", "Entity type", "source", "HeadOfOrganizationName", "HeadOfOrganizationTitle"
+    ]
+    final_df = final_df.drop(columns=[col for col in cols_to_remove if col in final_df.columns])
+    
+    # Helper function to create join keys
+    def create_join_key(series: pd.Series) -> pd.Series:
+        return series.astype(str).str.lower().str.strip()
+    
+    # Step 2: Join OPS data using "Name - Ops"
+    try:
+        ops_raw = pd.read_csv(os.path.join("data", "raw", "ops_data.csv"))
+        # Create new OPS columns
+        ops_raw["Ops_PrincipalOfficerName"] = ops_raw["Agency Head First Name"].fillna("").str.strip() + " " + ops_raw["Agency Head Last Name"].fillna("").str.strip()
+        ops_raw["Ops_URL"] = ops_raw["Agency/Board Website"]
+        ops_raw["Ops_Acronum"] = ops_raw["Agency Acronym"]
+        # Create join key in OPS data using "Agency Name"
+        ops_raw["join_key_ops"] = create_join_key(ops_raw["Agency Name"])
+        # Deduplicate OPS data on join_key_ops
+        ops_dedup = ops_raw.drop_duplicates(subset="join_key_ops")
+        # Create join key in final_df using "Name - Ops"
+        final_df["join_key_ops"] = create_join_key(final_df["Name - Ops"])
+        # Merge OPS columns based on join_key_ops
+        ops_subset = ops_dedup[["join_key_ops", "Ops_PrincipalOfficerName", "Ops_URL", "Ops_Acronum"]]
+        final_df = final_df.merge(ops_subset, on="join_key_ops", how="left")
+        logging.info("OPS data joined successfully using deduplicated join key.")
+    except Exception as e:
+        logging.error(f"Error processing OPS data for OPS columns: {e}")
+    
+    # Step 3: Join HOO data using "Name - HOO"
+    try:
+        hoo_raw = pd.read_csv(os.path.join("data", "raw", "nyc_gov_hoo.csv"))
+        # Create join key in HOO data using appropriate column
+        key_col = "AgencyNameEnriched" if "AgencyNameEnriched" in hoo_raw.columns else "Agency Name"
+        hoo_raw["join_key_hoo"] = create_join_key(hoo_raw[key_col])
+        final_df["join_key_hoo"] = create_join_key(final_df["Name - HOO"])
+        # Deduplicate HOO data on join_key_hoo
+        hoo_dedup = hoo_raw.drop_duplicates(subset="join_key_hoo")
+        hoo_subset = hoo_dedup[["join_key_hoo", "HoO Contact Link"]]
+        final_df = final_df.merge(hoo_subset, on="join_key_hoo", how="left")
+        logging.info("HOO data joined successfully using deduplicated join key.")
+    except Exception as e:
+        logging.error(f"Error processing HOO data for PrincipalOfficerContactURL: {e}")
+    
+    # Step 4: Join NYC.gov Agency List for Description_NYCWebsite using "Name - NYC.gov Agency List"
+    try:
+        nyc_list = pd.read_csv(os.path.join("data", "raw", "nyc_gov_agency_list.csv"))
+        if "Name - NYC.gov Agency List" in nyc_list.columns and "Description-nyc.gov" in nyc_list.columns:
+            nyc_list["join_key_nyc"] = create_join_key(nyc_list["Name - NYC.gov Agency List"])
+            final_df["join_key_nyc"] = create_join_key(final_df["Name - NYC.gov Agency List"])
+            # Deduplicate nyc_list on join_key_nyc
+            nyc_dedup = nyc_list.drop_duplicates(subset="join_key_nyc")
+            nyc_subset = nyc_dedup[["join_key_nyc", "Description-nyc.gov"]]
+            final_df = final_df.merge(nyc_subset, on="join_key_nyc", how="left")
+            final_df = final_df.rename(columns={"Description-nyc.gov": "Description_NYCWebsite"})
+            logging.info("NYC.gov Agency List data joined successfully for Description_NYCWebsite using deduplicated join key.")
+        else:
+            logging.warning("Required columns not found in nyc_gov_agency_list.csv for Description_NYCWebsite.")
+    except Exception as e:
+        logging.error(f"Error processing nyc_gov_agency_list.csv for Description_NYCWebsite: {e}")
+    
+    # Step 5: Drop temporary join key columns
+    final_df = final_df.drop(columns=["join_key_ops", "join_key_hoo", "join_key_nyc"], errors="ignore")
+    return final_df
+
+def main(data_dir: str, log_level: str, display: bool, save: bool, skip_apply_matches: bool):
     # Ensure necessary directories exist
     os.makedirs(os.path.join(data_dir, 'analysis'), exist_ok=True)
     os.makedirs(os.path.join(data_dir, 'processed'), exist_ok=True)
@@ -223,24 +299,28 @@ def main(data_dir: str, log_level: str, display: bool, save: bool, apply_matches
         # Apply manual override mappings to adjust final names and acronyms
         merged_df = apply_manual_overrides(merged_df)
         
+        # Apply final cleanup with deduplication of external data
+        final_df = final_cleanup(merged_df)
         final_path = os.path.join(data_dir, 'processed', 'final_deduplicated_dataset.csv')
-        merged_df.to_csv(final_path, index=False)
-        logger.info(f"Final deduplicated dataset saved to {final_path}. Final row count: {len(merged_df)}")
+        final_df.to_csv(final_path, index=False)
+        logger.info(f"Final deduplicated dataset saved to {final_path}. Final row count: {len(final_df)}")
         
         logger.info("Running quality checks...")
-        quality_checker.analyze_dataset(merged_df, 'NameNormalized', 'final_deduplicated_dataset')
+        quality_checker.analyze_dataset(final_df, 'NameNormalized', 'final_deduplicated_dataset')
         
-        # If the flag is set, apply verified matches by calling the external apply_matches module.
-        if apply_matches_flag:
+        # Default behavior: run apply_matches unless --skip-apply-matches is specified
+        if not skip_apply_matches:
             intermediate_dir = os.path.join(data_dir, 'intermediate')
             matches_path = os.path.join(data_dir, 'processed', 'consolidated_matches.csv')
-            logger.info("Applying verified matches to final deduplicated dataset...")
+            logger.info("Running apply_matches (default behavior)...")
             apply_matches(input_path=final_path, matches_path=matches_path,
                           output_path=os.path.join(data_dir, 'processed', 'final_deduplicated_dataset.csv'))
+        else:
+            logger.info("Skipping apply_matches as per flag.")
         
         if display:
             logger.info("\nFinal Dataset Sample:")
-            print(merged_df.head())
+            print(final_df.head())
         
     except Exception as e:
         logger.error(f"Error in main process: {e}")
@@ -252,7 +332,8 @@ if __name__ == "__main__":
     parser.add_argument('--log-level', type=str, default='INFO', help='Logging level')
     parser.add_argument('--display', action='store_true', help='Display the head of DataFrames')
     parser.add_argument('--save', action='store_true', help='Save intermediate results')
-    parser.add_argument('--apply-matches', action='store_true', help='Apply verified matches after deduplication')
+    # New flag: --skip-apply-matches. By default, apply_matches is run.
+    parser.add_argument('--skip-apply-matches', action='store_true', help='Skip running apply_matches')
     
     args = parser.parse_args()
-    main(args.data_dir, args.log_level, args.display, args.save, args.apply_matches)
+    main(args.data_dir, args.log_level, args.display, args.save, args.skip_apply_matches)

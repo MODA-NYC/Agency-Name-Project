@@ -47,9 +47,12 @@ class HooDataProcessor(BaseDataProcessor):
         df = self.handle_known_duplicates(df)
 
         # Rename columns according to mapping
-        for old_col, new_col in self.column_mappings.items():
-            if old_col in df.columns:
-                df[new_col] = df[old_col]
+        # First, ensure all column names in the mapping have whitespace stripped
+        cleaned_mappings = {k.strip(): v for k, v in self.column_mappings.items()}
+        df = df.rename(columns=cleaned_mappings)
+        
+        # Log columns after renaming for debugging
+        logging.info(f"Columns after renaming: {df.columns.tolist()}")
 
         # Create normalized name directly from Agency Name
         df['NameNormalized'] = df['Agency Name'].apply(full_standardize_name)

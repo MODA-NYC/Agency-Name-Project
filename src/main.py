@@ -11,6 +11,9 @@ from analysis.quality_checker import DataQualityChecker
 from data_merging import merge_dataframes, clean_merged_data, track_data_provenance, ensure_record_ids
 from preprocessing.global_normalization import apply_global_normalization
 from apply_matches import apply_matches
+import conflict_resolution_fields
+
+logger = logging.getLogger(__name__)
 
 def validate_dataframe_columns(df: pd.DataFrame, required_cols: List[str], df_name: str) -> None:
     """Validate that required columns exist in DataFrame."""
@@ -162,12 +165,13 @@ def final_cleanup(final_df: pd.DataFrame) -> pd.DataFrame:
     3. Add HOO data with deduplication
     4. Add NYC.gov Agency List data with deduplication
     5. Drop temporary join key columns
-    6. Rename and reorder columns for final export
+    6. Add conflict resolution fields
+    7. Rename and reorder columns for final export
     """
     # Step 1: Remove unwanted columns
     cols_to_remove = [
         "PrincipalOfficerGivenName", "PrincipalOfficerFamilyName",
-        "Agency Name", "Entity type", "source", "HeadOfOrganizationName", "HeadOfOrganizationTitle"
+        "Agency Name", "Entity type", "source"
     ]
     final_df = final_df.drop(columns=[col for col in cols_to_remove if col in final_df.columns])
     
@@ -180,8 +184,9 @@ def final_cleanup(final_df: pd.DataFrame) -> pd.DataFrame:
         ops_raw = pd.read_csv(os.path.join("data", "raw", "ops_data.csv"))
         # Create new OPS columns
         ops_raw["Ops_PrincipalOfficerName"] = ops_raw["Agency Head First Name"].fillna("").str.strip() + " " + ops_raw["Agency Head Last Name"].fillna("").str.strip()
-        ops_raw["Ops_URL"] = ops_raw["Agency/Board Website"]
-        ops_raw["Ops_Acronum"] = ops_raw["Agency Acronym"]
+        ops_raw["Ops_PrincipalOfficerTitle"] = ops_raw["Agency Head Title"].fillna("") if "Agency Head Title" in ops_raw.columns else ""
+        ops_raw["Ops_URL"] = ops_raw["Agency/Board Website"].fillna("")
+        ops_raw["Ops_Acronum"] = ops_raw["Agency Acronym"].fillna("")
         # Create join key in OPS data using "Agency Name"
         ops_raw["join_key_ops"] = create_join_key(ops_raw["Agency Name"])
         # Deduplicate OPS data on join_key_ops
@@ -189,11 +194,16 @@ def final_cleanup(final_df: pd.DataFrame) -> pd.DataFrame:
         # Create join key in final_df using "Name - Ops"
         final_df["join_key_ops"] = create_join_key(final_df["Name - Ops"])
         # Merge OPS columns based on join_key_ops
-        ops_subset = ops_dedup[["join_key_ops", "Ops_PrincipalOfficerName", "Ops_URL", "Ops_Acronum"]]
+        ops_subset = ops_dedup[["join_key_ops", "Ops_PrincipalOfficerName", "Ops_PrincipalOfficerTitle", "Ops_URL", "Ops_Acronum"]]
         final_df = final_df.merge(ops_subset, on="join_key_ops", how="left")
         logging.info("OPS data joined successfully using deduplicated join key.")
     except Exception as e:
-        logging.error(f"Error processing OPS data for OPS columns: {e}")
+        logging.error(f"Error processing OPS data: {e}")
+        # Initialize empty columns if OPS data processing fails
+        final_df["Ops_PrincipalOfficerName"] = ""
+        final_df["Ops_PrincipalOfficerTitle"] = ""
+        final_df["Ops_URL"] = ""
+        final_df["Ops_Acronum"] = ""
     
     # Step 3: Join HOO data using "Name - HOO"
     try:
@@ -238,7 +248,48 @@ def final_cleanup(final_df: pd.DataFrame) -> pd.DataFrame:
     # Step 5: Drop temporary join key columns
     final_df = final_df.drop(columns=["join_key_ops", "join_key_hoo", "join_key_nyc"], errors="ignore")
     
-    # Step 6: Rename and reorder columns for final export
+    # Step 6: Add conflict resolution fields
+    logging.info("Starting conflict resolution...")
+    logging.info(f"Available columns before conflict resolution: {final_df.columns.tolist()}")
+    
+    # Add conflict resolution fields for URLs
+    url_cols = [col for col in ['Ops_URL', 'HOO_URL', 'URL'] if col in final_df.columns]
+    logging.info(f"URL columns found for conflict resolution: {url_cols}")
+    if url_cols:
+        final_df[['URL_Status', 'Suggested_URL']] = final_df.apply(
+            lambda row: conflict_resolution_fields.resolve_conflict(row, url_cols, url_cols),
+            axis=1
+        )
+        logging.info("URL conflict resolution completed")
+        # Log a sample of the results
+        sample_urls = final_df[['URL_Status', 'Suggested_URL']].head()
+        logging.info(f"Sample URL resolution results:\n{sample_urls}")
+    else:
+        logging.warning("No URL columns found for conflict resolution")
+        final_df['URL_Status'] = ''
+        final_df['Suggested_URL'] = ''
+
+    # Add conflict resolution fields for Principal Officer Titles
+    po_title_cols = [col for col in ['Ops_PrincipalOfficerTitle', 'HeadOfOrganizationTitle'] if col in final_df.columns]
+    logging.info(f"Principal Officer Title columns found for conflict resolution: {po_title_cols}")
+    if po_title_cols:
+        final_df[['PO_Title_Status', 'Suggested_PO_Title']] = final_df.apply(
+            lambda row: conflict_resolution_fields.resolve_conflict(row, po_title_cols, po_title_cols),
+            axis=1
+        )
+        logging.info("Principal Officer Title conflict resolution completed")
+        # Log a sample of the results
+        sample_titles = final_df[['PO_Title_Status', 'Suggested_PO_Title']].head()
+        logging.info(f"Sample PO Title resolution results:\n{sample_titles}")
+    else:
+        logging.warning("No Principal Officer Title columns found for conflict resolution")
+        final_df['PO_Title_Status'] = ''
+        final_df['Suggested_PO_Title'] = ''
+    
+    logging.info(f"Available columns after conflict resolution: {final_df.columns.tolist()}")
+    logging.info("Conflict resolution completed")
+    
+    # Step 7: Rename and reorder columns for final export
     # Rename columns as specified
     if 'PrincipalOfficerName' in final_df.columns:
         final_df = final_df.rename(columns={'PrincipalOfficerName': 'HOO_PrincipalOfficerName'})
@@ -265,6 +316,8 @@ def final_cleanup(final_df: pd.DataFrame) -> pd.DataFrame:
         "PreliminaryOrganizationType",
         "Description",
         "URL",
+        "URL_Status",
+        "Suggested_URL",
         "ParentOrganization",
         "NYCReportingLine",
         "AuthorizingAuthority",
@@ -295,8 +348,13 @@ def final_cleanup(final_df: pd.DataFrame) -> pd.DataFrame:
         "HOO_URL",
         "HOO_PrincipalOfficerContactLink",
         "Ops_PrincipalOfficerName",
+        "Ops_PrincipalOfficerTitle",
         "Ops_URL",
-        "Ops_Acronym"
+        "Ops_Acronym",
+        "PO_Name_Status",
+        "Suggested_PO_Name",
+        "PO_Title_Status",
+        "Suggested_PO_Title"
     ]
 
     # Reorder columns, only including those that exist in the DataFrame
@@ -398,6 +456,37 @@ def main(data_dir: str, log_level: str, display: bool, save: bool, skip_apply_ma
             logger.info("Running apply_matches (default behavior)...")
             apply_matches(input_path=final_path, matches_path=matches_path,
                           output_path=os.path.join(data_dir, 'processed', 'final_deduplicated_dataset.csv'))
+            
+            # Reload the dataset after apply_matches
+            final_df = pd.read_csv(os.path.join(data_dir, 'processed', 'final_deduplicated_dataset.csv'))
+            
+            # Find Principal Officer Name columns
+            po_name_cols = [col for col in final_df.columns if 'PrincipalOfficerName' in col]
+            logger.info(f"Found Principal Officer Name columns: {po_name_cols}")
+
+            # Log NYPD row values before processing
+            nypd_rows = final_df[final_df['Name'].str.contains('Police Department', na=False)]
+            for _, row in nypd_rows.iterrows():
+                logger.info("NYPD Principal Officer values:")
+                for col in po_name_cols:
+                    logger.info(f"{col}: {row[col]}")
+
+            # Process each row
+            for idx, row in final_df.iterrows():
+                # Get the conflict resolution result for this row
+                result = conflict_resolution_fields.resolve_conflict(
+                    row, 
+                    po_name_cols,
+                    ['HOO_PrincipalOfficerName', 'Ops_PrincipalOfficerName']  # Priority order
+                )
+                
+                # result is a pandas Series with [status, suggested]
+                final_df.at[idx, 'PO_Name_Status'] = result.iloc[0]
+                final_df.at[idx, 'Suggested_PO_Name'] = result.iloc[1]
+            
+            # Save the updated DataFrame
+            final_df.to_csv(final_path, index=False)
+            
         else:
             logger.info("Skipping apply_matches as per flag.")
         

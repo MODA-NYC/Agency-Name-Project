@@ -85,7 +85,6 @@ else:
 # Add new fields if they don't exist
 new_fields = [
     'PrincipalOfficerContactURL',
-    'HeadOfOrganizationName',
     'HeadOfOrganizationTitle',
     'HeadOfOrganizationURL',
     'MMRChapter',
@@ -115,12 +114,11 @@ print("Removed obsolete fields from data dictionary.")
 # Add definitions for new fields
 new_fields_definitions = {
     'PrincipalOfficerContactURL': "The contact URL for the principal officer of the organization.",
-    'HeadOfOrganizationName': "The name of the head of the organization.",
     'HeadOfOrganizationTitle': "The title of the head of the organization.",
     'HeadOfOrganizationURL': "The contact URL for the head of the organization.",
     'MMRChapter': "Indicates if the organization has a chapter in the Mayor's Management Report.",
     'RulemakingEntity': "Indicates whether the organization is a rulemaking entity.",
-    'Name - NYC.gov Redesign - Original Value': "The original 'Agency Name' from the NYC.gov dataset before any modifications."  # Add this line
+    'Name - NYC.gov Redesign - Original Value': "The original 'Agency Name' from the NYC.gov dataset before any modifications."
 }
 
 # Prepare new definitions as a DataFrame

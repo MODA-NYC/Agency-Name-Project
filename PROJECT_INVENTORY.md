@@ -68,6 +68,7 @@
 - `src/apply_verified_matches.py` - Applies verified matches
 - `src/create_initial_release.py` - Generates initial release dataset by removing specified fields and filtering records
 - `src/scrape_nyc_gov_agency_list.py` - Scrapes agency information from NYC.gov website
+- `src/conflict_resolution_fields.py` - Helper module for resolving conflicts between multiple data sources for URLs and Principal Officer information
 
 ## Data Files
 

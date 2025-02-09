@@ -19,7 +19,7 @@ class HooDataProcessor(BaseDataProcessor):
         }
 
         self.column_mappings = {
-            'Head of Organization': 'HeadOfOrganizationName',
+            'Head of Organization': 'HOO_PrincipalOfficerName',
             'HoO Title': 'HeadOfOrganizationTitle',
             'Agency Link (URL)': 'HOO_URL',
             'Agency Name': 'Agency Name',

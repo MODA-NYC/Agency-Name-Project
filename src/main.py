@@ -171,7 +171,7 @@ def final_cleanup(final_df: pd.DataFrame) -> pd.DataFrame:
     # Step 1: Remove unwanted columns
     cols_to_remove = [
         "PrincipalOfficerGivenName", "PrincipalOfficerFamilyName",
-        "Agency Name", "Entity type", "source"
+        "Agency Name", "Entity type", "source", "PrincipalOfficerName"
     ]
     final_df = final_df.drop(columns=[col for col in cols_to_remove if col in final_df.columns])
     
@@ -216,12 +216,12 @@ def final_cleanup(final_df: pd.DataFrame) -> pd.DataFrame:
         final_df["join_key_hoo"] = create_join_key(final_df["Name - HOO"])
         # Deduplicate HOO data on join_key_hoo
         hoo_dedup = hoo_data.drop_duplicates(subset="join_key_hoo")
-        # Include HOO_URL and HOO_PrincipalOfficerContactLink
-        hoo_subset = hoo_dedup[["join_key_hoo", "HOO_URL", "HOO_PrincipalOfficerContactLink"]]
+        # Include HOO_URL, HOO_PrincipalOfficerName, and HOO_PrincipalOfficerContactLink
+        hoo_subset = hoo_dedup[["join_key_hoo", "HOO_URL", "HOO_PrincipalOfficerName", "HOO_PrincipalOfficerContactLink"]]
         
-        # Drop existing HOO_PrincipalOfficerContactLink column if it exists to avoid duplicates
-        if "HOO_PrincipalOfficerContactLink" in final_df.columns:
-            final_df = final_df.drop(columns=["HOO_PrincipalOfficerContactLink"])
+        # Drop existing HOO columns if they exist to avoid duplicates
+        hoo_cols_to_drop = ["HOO_PrincipalOfficerContactLink", "HOO_PrincipalOfficerName", "HOO_URL"]
+        final_df = final_df.drop(columns=[col for col in hoo_cols_to_drop if col in final_df.columns])
         
         final_df = final_df.merge(hoo_subset, on="join_key_hoo", how="left")
         logging.info("HOO data joined successfully using deduplicated join key.")
@@ -291,8 +291,6 @@ def final_cleanup(final_df: pd.DataFrame) -> pd.DataFrame:
     
     # Step 7: Rename and reorder columns for final export
     # Rename columns as specified
-    if 'PrincipalOfficerName' in final_df.columns:
-        final_df = final_df.rename(columns={'PrincipalOfficerName': 'HOO_PrincipalOfficerName'})
     if 'PrincipalOfficerTitle' in final_df.columns:
         final_df = final_df.rename(columns={'PrincipalOfficerTitle': 'HOO_PrincipalOfficerTitle'})
     if 'Ops_Acronum' in final_df.columns:

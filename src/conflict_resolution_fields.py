@@ -1,6 +1,39 @@
 import pandas as pd
 import logging
 
+def resolve_po_name(row: pd.Series) -> pd.Series:
+    """
+    Resolve the principal officer name according to specific business rules:
+    1. If Ops_PrincipalOfficerName exists and is non-empty, use that
+    2. Otherwise, use HOO_PrincipalOfficerName if it exists and is non-empty
+    3. If neither exists or both are empty, return empty string
+    
+    Args:
+        row (pd.Series): A row from the DataFrame containing principal officer name fields
+        
+    Returns:
+        pd.Series: A two-element series containing [status, suggested_value] where:
+            - status is either "match" if values are identical or "conflict: val1, val2" if different
+            - suggested_value follows the priority order specified above
+    """
+    ops_name = str(row.get('Ops_PrincipalOfficerName', '')).strip()
+    hoo_name = str(row.get('HOO_PrincipalOfficerName', '')).strip()
+    
+    # Determine suggested value based on priority
+    suggested = ops_name if ops_name else hoo_name
+    
+    # Determine status
+    if not ops_name and not hoo_name:
+        status = "match"  # Both empty is considered a match
+    elif not ops_name or not hoo_name:
+        status = "match"  # One empty and one value is considered a match
+    elif ops_name.lower() == hoo_name.lower():
+        status = "match"
+    else:
+        status = f"conflict: '{ops_name}' (from Ops), '{hoo_name}' (from HOO)"
+    
+    return pd.Series([status, suggested])
+
 def resolve_conflict(row, candidate_cols, priority_order):
     """
     Given a row and candidate columns, compute:
@@ -19,6 +52,10 @@ def resolve_conflict(row, candidate_cols, priority_order):
     Returns:
         pd.Series: A two-element Series: [status, suggested_value].
     """
+    # Special case for principal officer name resolution
+    if set(candidate_cols) == {'Ops_PrincipalOfficerName', 'HOO_PrincipalOfficerName'}:
+        return resolve_po_name(row)
+    
     # Special debug for NYPD
     is_nypd = False
     if 'Name' in row and isinstance(row['Name'], str) and 'Police Department' in row['Name']:

@@ -38,7 +38,7 @@ def merge_dataframes(primary_df: pd.DataFrame, ops_df: pd.DataFrame, hoo_df: pd.
     
     # Define columns to keep from each source
     ops_cols = ['RecordID', 'NameNormalized', 'OPS_Name', 'Agency Name', 'Entity type', 'source']
-    hoo_cols = ['RecordID', 'NameNormalized', 'HOO_Name', 'Agency Name', 'HeadOfOrganizationName', 'HeadOfOrganizationTitle', 'source', 'AgencyNameEnriched', 'HoO Contact Link', 'PrincipalOfficerName']
+    hoo_cols = ['RecordID', 'NameNormalized', 'HOO_Name', 'Agency Name', 'HeadOfOrganizationName', 'HeadOfOrganizationTitle', 'source', 'AgencyNameEnriched', 'HOO_PrincipalOfficerContactLink', 'PrincipalOfficerName']
     
     # First merge: Primary and OPS (outer join)
     merged = pd.merge(

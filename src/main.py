@@ -162,6 +162,7 @@ def final_cleanup(final_df: pd.DataFrame) -> pd.DataFrame:
     3. Add HOO data with deduplication
     4. Add NYC.gov Agency List data with deduplication
     5. Drop temporary join key columns
+    6. Rename and reorder columns for final export
     """
     # Step 1: Remove unwanted columns
     cols_to_remove = [
@@ -203,7 +204,7 @@ def final_cleanup(final_df: pd.DataFrame) -> pd.DataFrame:
         final_df["join_key_hoo"] = create_join_key(final_df["Name - HOO"])
         # Deduplicate HOO data on join_key_hoo
         hoo_dedup = hoo_raw.drop_duplicates(subset="join_key_hoo")
-        hoo_subset = hoo_dedup[["join_key_hoo", "HoO Contact Link"]]
+        hoo_subset = hoo_dedup[["join_key_hoo", "HOO_PrincipalOfficerContactLink"]]
         final_df = final_df.merge(hoo_subset, on="join_key_hoo", how="left")
         logging.info("HOO data joined successfully using deduplicated join key.")
     except Exception as e:
@@ -228,6 +229,79 @@ def final_cleanup(final_df: pd.DataFrame) -> pd.DataFrame:
     
     # Step 5: Drop temporary join key columns
     final_df = final_df.drop(columns=["join_key_ops", "join_key_hoo", "join_key_nyc"], errors="ignore")
+    
+    # Step 6: Rename and reorder columns for final export
+    # Rename columns as specified
+    if 'PrincipalOfficerName' in final_df.columns:
+        final_df = final_df.rename(columns={'PrincipalOfficerName': 'HOO_PrincipalOfficerName'})
+    if 'PrincipalOfficerTitle' in final_df.columns:
+        final_df = final_df.rename(columns={'PrincipalOfficerTitle': 'HOO_PrincipalOfficerTitle'})
+    if 'Ops_Acronum' in final_df.columns:
+        final_df = final_df.rename(columns={'Ops_Acronum': 'Ops_Acronym'})
+
+    # Define the desired final column order
+    desired_order = [
+        "Name",
+        "NameAlphabetized",
+        "Name - CPO",
+        "Name - Checkbook",
+        "Name - Greenbook",
+        "Name - HOO",
+        "Name - NYC Open Data Portal",
+        "Name - NYC.gov Agency List",
+        "Name - NYC.gov Mayor's Office",
+        "Name - ODA",
+        "Name - Ops",
+        "Name - WeGov",
+        "OperationalStatus",
+        "PreliminaryOrganizationType",
+        "Description",
+        "URL",
+        "ParentOrganization",
+        "NYCReportingLine",
+        "AuthorizingAuthority",
+        "LegalCitation",
+        "LegalCitationURL",
+        "LegalCitationText",
+        "LegalName",
+        "AlternateNames",
+        "Acronym",
+        "AlternateAcronyms",
+        "BudgetCode",
+        "OpenDatasetsURL",
+        "Notes",
+        "FoundingYear",
+        "SunsetYear",
+        "URISlug",
+        "DateCreated",
+        "DateModified",
+        "LastVerifiedDate",
+        "NameWithAcronym",
+        "NameAlphabetizedWithAcronym",
+        "NameNormalized",
+        "RecordID",
+        "merged_from",
+        "data_source",
+        "HOO_PrincipalOfficerName",
+        "HOO_PrincipalOfficerTitle",
+        "HOO_PrincipalOfficerContactLink",
+        "Ops_PrincipalOfficerName",
+        "Ops_URL",
+        "Ops_Acronym"
+    ]
+
+    # Reorder columns, only including those that exist in the DataFrame
+    existing_columns = [col for col in desired_order if col in final_df.columns]
+    
+    # Log any columns in the DataFrame that weren't in our desired order
+    extra_columns = [col for col in final_df.columns if col not in desired_order]
+    if extra_columns:
+        logging.warning(f"Additional columns found that weren't in desired order: {extra_columns}")
+        existing_columns.extend(extra_columns)
+    
+    # Apply the column ordering
+    final_df = final_df[existing_columns]
+    
     return final_df
 
 def main(data_dir: str, log_level: str, display: bool, save: bool, skip_apply_matches: bool):

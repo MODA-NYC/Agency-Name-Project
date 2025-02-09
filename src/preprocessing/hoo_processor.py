@@ -22,7 +22,8 @@ class HooDataProcessor(BaseDataProcessor):
             'Head of Organization': 'HeadOfOrganizationName',
             'HoO Title': 'HeadOfOrganizationTitle',
             'Agency Link (URL)': 'HeadOfOrganizationURL',
-            'Agency Name': 'Agency Name'
+            'Agency Name': 'Agency Name',
+            'HoO Contact Link': 'HOO_PrincipalOfficerContactLink'
         }
 
     def process(self, input_path: str) -> pd.DataFrame:

@@ -34,6 +34,39 @@ def resolve_po_name(row: pd.Series) -> pd.Series:
     
     return pd.Series([status, suggested])
 
+def resolve_po_title(row: pd.Series) -> pd.Series:
+    """
+    Resolve the principal officer title according to specific business rules:
+    1. If Ops_PrincipalOfficerTitle exists and is non-empty, use that
+    2. Otherwise, use HeadOfOrganizationTitle if it exists and is non-empty
+    3. If neither exists or both are empty, return empty string
+    
+    Args:
+        row (pd.Series): A row from the DataFrame containing principal officer title fields
+        
+    Returns:
+        pd.Series: A two-element series containing [status, suggested_value] where:
+            - status is either "match" if values are identical or "conflict: val1, val2" if different
+            - suggested_value follows the priority order specified above
+    """
+    ops_title = str(row.get('Ops_PrincipalOfficerTitle', '')).strip()
+    hoo_title = str(row.get('HeadOfOrganizationTitle', '')).strip()
+    
+    # Determine suggested value based on priority
+    suggested = ops_title if ops_title else hoo_title
+    
+    # Determine status
+    if not ops_title and not hoo_title:
+        status = "match"  # Both empty is considered a match
+    elif not ops_title or not hoo_title:
+        status = "match"  # One empty and one value is considered a match
+    elif ops_title.lower() == hoo_title.lower():
+        status = "match"
+    else:
+        status = f"conflict: '{ops_title}' (from Ops), '{hoo_title}' (from HOO)"
+    
+    return pd.Series([status, suggested])
+
 def resolve_conflict(row, candidate_cols, priority_order):
     """
     Given a row and candidate columns, compute:
@@ -55,6 +88,10 @@ def resolve_conflict(row, candidate_cols, priority_order):
     # Special case for principal officer name resolution
     if set(candidate_cols) == {'Ops_PrincipalOfficerName', 'HOO_PrincipalOfficerName'}:
         return resolve_po_name(row)
+    
+    # Special case for principal officer title resolution
+    if set(candidate_cols) == {'Ops_PrincipalOfficerTitle', 'HeadOfOrganizationTitle'}:
+        return resolve_po_title(row)
     
     # Special debug for NYPD
     is_nypd = False

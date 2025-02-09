@@ -197,18 +197,26 @@ def final_cleanup(final_df: pd.DataFrame) -> pd.DataFrame:
     
     # Step 3: Join HOO data using "Name - HOO"
     try:
-        hoo_raw = pd.read_csv(os.path.join("data", "raw", "nyc_gov_hoo.csv"))
-        # Create join key in HOO data using appropriate column
-        key_col = "AgencyNameEnriched" if "AgencyNameEnriched" in hoo_raw.columns else "Agency Name"
-        hoo_raw["join_key_hoo"] = create_join_key(hoo_raw[key_col])
+        # Initialize HOO processor
+        hoo_processor = HooDataProcessor()
+        # Process HOO data
+        hoo_data = hoo_processor.process(os.path.join("data", "raw", "nyc_gov_hoo.csv"))
+        # Create join key in HOO data
+        hoo_data["join_key_hoo"] = create_join_key(hoo_data["AgencyNameEnriched"] if "AgencyNameEnriched" in hoo_data.columns else hoo_data["Agency Name"])
         final_df["join_key_hoo"] = create_join_key(final_df["Name - HOO"])
         # Deduplicate HOO data on join_key_hoo
-        hoo_dedup = hoo_raw.drop_duplicates(subset="join_key_hoo")
-        hoo_subset = hoo_dedup[["join_key_hoo", "HOO_PrincipalOfficerContactLink"]]
+        hoo_dedup = hoo_data.drop_duplicates(subset="join_key_hoo")
+        # Include HOO_URL and HOO_PrincipalOfficerContactLink
+        hoo_subset = hoo_dedup[["join_key_hoo", "HOO_URL", "HOO_PrincipalOfficerContactLink"]]
+        
+        # Drop existing HOO_PrincipalOfficerContactLink column if it exists to avoid duplicates
+        if "HOO_PrincipalOfficerContactLink" in final_df.columns:
+            final_df = final_df.drop(columns=["HOO_PrincipalOfficerContactLink"])
+        
         final_df = final_df.merge(hoo_subset, on="join_key_hoo", how="left")
         logging.info("HOO data joined successfully using deduplicated join key.")
     except Exception as e:
-        logging.error(f"Error processing HOO data for PrincipalOfficerContactURL: {e}")
+        logging.error(f"Error processing HOO data: {e}")
     
     # Step 4: Join NYC.gov Agency List for Description_NYCWebsite using "Name - NYC.gov Agency List"
     try:
@@ -284,6 +292,7 @@ def final_cleanup(final_df: pd.DataFrame) -> pd.DataFrame:
         "data_source",
         "HOO_PrincipalOfficerName",
         "HOO_PrincipalOfficerTitle",
+        "HOO_URL",
         "HOO_PrincipalOfficerContactLink",
         "Ops_PrincipalOfficerName",
         "Ops_URL",

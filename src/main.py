@@ -154,6 +154,42 @@ def apply_manual_overrides(final_df: pd.DataFrame) -> pd.DataFrame:
             logging.info(f"Applied override for '{current_name}': set Name to '{override['Name']}' and Acronym to '{override['Acronym']}'")
     return final_df
 
+def create_clean_export(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Creates a clean export by removing specified fields and renaming others.
+    """
+    # Create a copy to avoid modifying the original
+    clean_df = df.copy()
+    
+    # Fields to remove
+    fields_to_remove = [
+        'PrincipalOfficerName',
+        'PrincipalOfficerTitle',
+        'PrincipalOfficerGivenName',
+        'PrincipalOfficerFamilyName',
+        'NameNormalized',
+        'Agency Name',
+        'Entity type',
+        'source'
+    ]
+    
+    # Remove specified fields if they exist
+    for field in fields_to_remove:
+        if field in clean_df.columns:
+            clean_df = clean_df.drop(columns=[field])
+    
+    # Rename fields
+    field_renames = {
+        'HeadOfOrganizationName': 'HOO_PrincipalOfficerName',
+        'HeadOfOrganizationTitle': 'HOO_PrincipalOfficerTitle',
+        'PrincipalOfficerContactURL': 'HOO_PrincipalOfficerContactURL'
+    }
+    
+    # Rename fields if they exist
+    clean_df = clean_df.rename(columns={old: new for old, new in field_renames.items() if old in clean_df.columns})
+    
+    return clean_df
+
 def main(data_dir: str, log_level: str, display: bool, save: bool, apply_matches_flag: bool):
     # Ensure necessary directories exist
     os.makedirs(os.path.join(data_dir, 'analysis'), exist_ok=True)
@@ -223,24 +259,46 @@ def main(data_dir: str, log_level: str, display: bool, save: bool, apply_matches
         # Apply manual override mappings to adjust final names and acronyms
         merged_df = apply_manual_overrides(merged_df)
         
+        # Create exports directory if it doesn't exist
+        exports_dir = os.path.join(data_dir, 'exports')
+        os.makedirs(exports_dir, exist_ok=True)
+        
+        # First, save the full dataset with all fields
+        full_export_path = os.path.join(exports_dir, 'full_dataset.csv')
+        merged_df.to_csv(full_export_path, index=False)
+        logger.info(f"Full dataset saved to {full_export_path}. Row count: {len(merged_df)}")
+        
+        # By default, apply matches unless explicitly skipped
+        if apply_matches_flag:
+            matches_path = os.path.join(data_dir, 'processed', 'consolidated_matches.csv')
+            logger.info("Applying verified matches to full dataset...")
+            apply_matches(
+                input_path=full_export_path,
+                matches_path=matches_path,
+                output_path=full_export_path
+            )
+            # Reload the dataset after applying matches
+            merged_df = pd.read_csv(full_export_path)
+        else:
+            logger.info("Skipping match application (--skip-matches flag was set)")
+        
+        # Create and save the clean export
+        clean_df = create_clean_export(merged_df)
+        clean_export_path = os.path.join(exports_dir, 'clean_dataset.csv')
+        clean_df.to_csv(clean_export_path, index=False)
+        logger.info(f"Clean dataset saved to {clean_export_path}. Row count: {len(clean_df)}")
+        
+        # For backward compatibility, also save the clean version as final_deduplicated_dataset.csv
         final_path = os.path.join(data_dir, 'processed', 'final_deduplicated_dataset.csv')
-        merged_df.to_csv(final_path, index=False)
-        logger.info(f"Final deduplicated dataset saved to {final_path}. Final row count: {len(merged_df)}")
+        clean_df.to_csv(final_path, index=False)
+        logger.info(f"Clean dataset also saved to {final_path} for backward compatibility")
         
         logger.info("Running quality checks...")
-        quality_checker.analyze_dataset(merged_df, 'NameNormalized', 'final_deduplicated_dataset')
-        
-        # If the flag is set, apply verified matches by calling the external apply_matches module.
-        if apply_matches_flag:
-            intermediate_dir = os.path.join(data_dir, 'intermediate')
-            matches_path = os.path.join(data_dir, 'processed', 'consolidated_matches.csv')
-            logger.info("Applying verified matches to final deduplicated dataset...")
-            apply_matches(input_path=final_path, matches_path=matches_path,
-                          output_path=os.path.join(data_dir, 'processed', 'final_deduplicated_dataset.csv'))
+        quality_checker.analyze_dataset(merged_df, 'Name', 'final_deduplicated_dataset')
         
         if display:
             logger.info("\nFinal Dataset Sample:")
-            print(merged_df.head())
+            print(clean_df.head())
         
     except Exception as e:
         logger.error(f"Error in main process: {e}")
@@ -252,7 +310,8 @@ if __name__ == "__main__":
     parser.add_argument('--log-level', type=str, default='INFO', help='Logging level')
     parser.add_argument('--display', action='store_true', help='Display the head of DataFrames')
     parser.add_argument('--save', action='store_true', help='Save intermediate results')
-    parser.add_argument('--apply-matches', action='store_true', help='Apply verified matches after deduplication')
+    parser.add_argument('--skip-matches', action='store_true', help='Skip applying verified matches (by default matches are applied)')
     
     args = parser.parse_args()
-    main(args.data_dir, args.log_level, args.display, args.save, args.apply_matches)
+    # Invert the skip-matches flag to get apply_matches_flag
+    main(args.data_dir, args.log_level, args.display, args.save, not args.skip_matches)

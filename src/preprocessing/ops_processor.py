@@ -35,9 +35,21 @@ class OpsDataProcessor(BaseDataProcessor):
         df['source'] = 'ops'
 
         # Create Ops_PrincipalOfficerName from first and last name fields
-        df['Ops_PrincipalOfficerName'] = (df['Agency Head First Name'].fillna('') + ' ' + df['Agency Head Last Name'].fillna('')).str.strip()
-        # Remove empty strings
-        df.loc[df['Ops_PrincipalOfficerName'] == '', 'Ops_PrincipalOfficerName'] = None
+        # First ensure the fields exist and handle NaN values properly
+        df['Agency Head First Name'] = df.get('Agency Head First Name', pd.Series(dtype='object')).fillna('')
+        df['Agency Head Last Name'] = df.get('Agency Head Last Name', pd.Series(dtype='object')).fillna('')
+        
+        # Combine first and last names, handling various edge cases
+        df['Ops_PrincipalOfficerName'] = df.apply(
+            lambda row: ' '.join(filter(None, [
+                str(row['Agency Head First Name']).strip(),
+                str(row['Agency Head Last Name']).strip()
+            ])),
+            axis=1
+        )
+        
+        # Convert empty strings to NaN
+        df.loc[df['Ops_PrincipalOfficerName'] == '', 'Ops_PrincipalOfficerName'] = pd.NA
         
         # Add Ops_URL from Agency/Board Website
         df['Ops_URL'] = df['Agency/Board Website']

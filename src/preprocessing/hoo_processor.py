@@ -52,6 +52,11 @@ class HooDataProcessor(BaseDataProcessor):
             if old_col in df.columns:
                 df[new_col] = df[old_col]
 
+        # Ensure proper handling of HeadOfOrganizationName
+        if 'Head of Organization' in df.columns:
+            df['HeadOfOrganizationName'] = df['Head of Organization'].fillna('').str.strip()
+            df.loc[df['HeadOfOrganizationName'] == '', 'HeadOfOrganizationName'] = pd.NA
+
         # Create normalized name directly from Agency Name
         df['NameNormalized'] = df['Agency Name'].apply(full_standardize_name)
         
@@ -83,6 +88,9 @@ class HooDataProcessor(BaseDataProcessor):
         
         # Preserve original name in HOO_Name column
         df['HOO_Name'] = df['AgencyNameEnriched']  # Now using enriched name to preserve the full context
+        
+        # Add HOO_PrincipalOfficerName from HeadOfOrganizationName
+        df['HOO_PrincipalOfficerName'] = df['HeadOfOrganizationName']
         
         # Add source column
         df['source'] = 'nyc_gov'

@@ -22,6 +22,7 @@ class HooDataProcessor(BaseDataProcessor):
             'Head of Organization': 'HeadOfOrganizationName',
             'HoO Title': 'HeadOfOrganizationTitle',
             'Agency Link (URL)': 'HeadOfOrganizationURL',
+            'HoO Contact Link': 'PrincipalOfficerContactURL',
             'Agency Name': 'Agency Name'
         }
 

@@ -156,10 +156,54 @@ def apply_manual_overrides(final_df: pd.DataFrame) -> pd.DataFrame:
 
 def create_clean_export(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Creates a clean export by removing specified fields and renaming others.
+    Creates a clean export by removing specified fields, renaming others, and computing new status fields.
+    
+    New fields computed:
+    - PO_Name_Status: Shows if HOO and Ops officer names match or displays the conflict
+    - URL_Status: Shows if all URLs match or displays the conflicts
+    - Suggested_URL: Prioritizes HOO_URL, then URL, then Ops_URL
+    - Suggested_PrincipalOfficerName: Uses Ops_PrincipalOfficerName if present, otherwise HOO_PrincipalOfficerName
     """
     # Create a copy to avoid modifying the original
     clean_df = df.copy()
+    
+    # Ensure proper handling of NaN values in officer names
+    clean_df['Ops_PrincipalOfficerName'] = clean_df['Ops_PrincipalOfficerName'].fillna('')
+    clean_df['HOO_PrincipalOfficerName'] = clean_df['HOO_PrincipalOfficerName'].fillna('')
+    
+    # PO Name Status - compare after stripping whitespace
+    clean_df["PO_Name_Status"] = clean_df.apply(lambda row: 
+        "match" if (str(row['HOO_PrincipalOfficerName']).strip() == 
+                   str(row['Ops_PrincipalOfficerName']).strip() and
+                   str(row['HOO_PrincipalOfficerName']).strip() != '')  # Only consider it a match if there's actually a value
+        else f"conflict: HOO: {str(row['HOO_PrincipalOfficerName']).strip()} | OPS: {str(row['Ops_PrincipalOfficerName']).strip()}", 
+        axis=1)
+    
+    # URL Status - compare after stripping whitespace
+    clean_df["URL_Status"] = clean_df.apply(lambda row:
+        "match" if (str(row.get("URL", "")).strip() == 
+                   str(row.get("Ops_URL", "")).strip() == 
+                   str(row.get("HeadOfOrganizationURL", "")).strip() and
+                   str(row.get("URL", "")).strip() != '')  # Only consider it a match if there's actually a value
+        else f"conflict: URL: {str(row.get('URL', '')).strip()} | HOO_URL: {str(row.get('HeadOfOrganizationURL', '')).strip()} | Ops_URL: {str(row.get('Ops_URL', '')).strip()}", 
+        axis=1)
+    
+    # Suggested URL (prioritize HOO_URL, then URL, then Ops_URL)
+    clean_df["Suggested_URL"] = clean_df.apply(lambda row:
+        str(row.get("HeadOfOrganizationURL", "")).strip() if pd.notna(row.get("HeadOfOrganizationURL")) and str(row.get("HeadOfOrganizationURL", "")).strip()
+        else (str(row.get("URL", "")).strip() if pd.notna(row.get("URL")) and str(row.get("URL", "")).strip()
+              else (str(row.get("Ops_URL", "")).strip() if pd.notna(row.get("Ops_URL")) 
+                    else "")), 
+        axis=1)
+    
+    # Suggested PrincipalOfficerName - Use Ops_PrincipalOfficerName if present, otherwise HOO_PrincipalOfficerName
+    clean_df["Suggested_PrincipalOfficerName"] = clean_df.apply(lambda row:
+        str(row['Ops_PrincipalOfficerName']).strip() if pd.notna(row['Ops_PrincipalOfficerName']) and str(row['Ops_PrincipalOfficerName']).strip()
+        else str(row['HOO_PrincipalOfficerName']).strip(),
+        axis=1)
+    
+    # Convert empty strings back to NaN for consistency
+    clean_df["Suggested_PrincipalOfficerName"] = clean_df["Suggested_PrincipalOfficerName"].replace('', pd.NA)
     
     # Fields to remove
     fields_to_remove = [
@@ -182,7 +226,8 @@ def create_clean_export(df: pd.DataFrame) -> pd.DataFrame:
     field_renames = {
         'HeadOfOrganizationName': 'HOO_PrincipalOfficerName',
         'HeadOfOrganizationTitle': 'HOO_PrincipalOfficerTitle',
-        'PrincipalOfficerContactURL': 'HOO_PrincipalOfficerContactURL'
+        'PrincipalOfficerContactURL': 'HOO_PrincipalOfficerContactURL',
+        'HeadOfOrganizationURL': 'HOO_URL'
     }
     
     # Rename fields if they exist
@@ -259,12 +304,8 @@ def main(data_dir: str, log_level: str, display: bool, save: bool, apply_matches
         # Apply manual override mappings to adjust final names and acronyms
         merged_df = apply_manual_overrides(merged_df)
         
-        # Create exports directory if it doesn't exist
-        exports_dir = os.path.join(data_dir, 'exports')
-        os.makedirs(exports_dir, exist_ok=True)
-        
         # First, save the full dataset with all fields
-        full_export_path = os.path.join(exports_dir, 'full_dataset.csv')
+        full_export_path = os.path.join(data_dir, 'exports', 'full_dataset.csv')
         merged_df.to_csv(full_export_path, index=False)
         logger.info(f"Full dataset saved to {full_export_path}. Row count: {len(merged_df)}")
         
@@ -281,10 +322,10 @@ def main(data_dir: str, log_level: str, display: bool, save: bool, apply_matches
             merged_df = pd.read_csv(full_export_path)
         else:
             logger.info("Skipping match application (--skip-matches flag was set)")
-        
-        # Create and save the clean export
+            
+        # Create and save the clean export (now includes computing new fields)
         clean_df = create_clean_export(merged_df)
-        clean_export_path = os.path.join(exports_dir, 'clean_dataset.csv')
+        clean_export_path = os.path.join(data_dir, 'exports', 'clean_dataset.csv')
         clean_df.to_csv(clean_export_path, index=False)
         logger.info(f"Clean dataset saved to {clean_export_path}. Row count: {len(clean_df)}")
         

@@ -34,6 +34,14 @@ class OpsDataProcessor(BaseDataProcessor):
         # Add source column
         df['source'] = 'ops'
 
+        # Create Ops_PrincipalOfficerName from first and last name fields
+        df['Ops_PrincipalOfficerName'] = (df['Agency Head First Name'].fillna('') + ' ' + df['Agency Head Last Name'].fillna('')).str.strip()
+        # Remove empty strings
+        df.loc[df['Ops_PrincipalOfficerName'] == '', 'Ops_PrincipalOfficerName'] = None
+        
+        # Add Ops_URL from Agency/Board Website
+        df['Ops_URL'] = df['Agency/Board Website']
+
         # Add RecordID column if it doesn't exist
         if 'RecordID' not in df.columns:
             df['RecordID'] = df.index.map(lambda x: f'OPS_{x:06d}')

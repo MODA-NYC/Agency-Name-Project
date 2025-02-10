@@ -37,7 +37,7 @@ def merge_dataframes(primary_df: pd.DataFrame, ops_df: pd.DataFrame, hoo_df: pd.
             raise ValueError("All dataframes must have NameNormalized column")
     
     # Define columns to keep from each source
-    ops_cols = ['RecordID', 'NameNormalized', 'OPS_Name', 'Agency Name', 'Entity type', 'source']
+    ops_cols = ['RecordID', 'NameNormalized', 'OPS_Name', 'Agency Name', 'Entity type', 'source', 'Ops_PrincipalOfficerName', 'Ops_URL']
     hoo_cols = ['RecordID', 'NameNormalized', 'HOO_Name', 'Agency Name', 'HeadOfOrganizationName', 'HeadOfOrganizationTitle', 'source', 'AgencyNameEnriched', 'PrincipalOfficerContactURL', 'PrincipalOfficerName']
     
     # First merge: Primary and OPS (outer join)

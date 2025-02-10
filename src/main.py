@@ -252,18 +252,16 @@ def final_cleanup(final_df: pd.DataFrame) -> pd.DataFrame:
     logging.info("Starting conflict resolution...")
     logging.info(f"Available columns before conflict resolution: {final_df.columns.tolist()}")
     
-    # Add conflict resolution fields for URLs
+    # Add conflict resolution fields for URLs - only compute URL_Status, Suggested_URL will be set later
     url_cols = [col for col in ['Ops_URL', 'HOO_URL', 'URL'] if col in final_df.columns]
     logging.info(f"URL columns found for conflict resolution: {url_cols}")
     if url_cols:
-        final_df[['URL_Status', 'Suggested_URL']] = final_df.apply(
+        final_df[['URL_Status', '_']] = final_df.apply(
             lambda row: conflict_resolution_fields.resolve_conflict(row, url_cols, url_cols),
             axis=1
         )
-        logging.info("URL conflict resolution completed")
-        # Log a sample of the results
-        sample_urls = final_df[['URL_Status', 'Suggested_URL']].head()
-        logging.info(f"Sample URL resolution results:\n{sample_urls}")
+        final_df = final_df.drop('_', axis=1)  # Drop the temporary column
+        logging.info("URL status resolution completed")
     else:
         logging.warning("No URL columns found for conflict resolution")
         final_df['URL_Status'] = ''
@@ -469,7 +467,7 @@ def main(data_dir: str, log_level: str, display: bool, save: bool, skip_apply_ma
                 for col in po_name_cols:
                     logger.info(f"{col}: {row[col]}")
 
-            # Process each row
+            # Process each row for conflict resolution for Principal Officer Name
             for idx, row in final_df.iterrows():
                 # Get the conflict resolution result for this row
                 result = conflict_resolution_fields.resolve_conflict(
@@ -481,6 +479,26 @@ def main(data_dir: str, log_level: str, display: bool, save: bool, skip_apply_ma
                 # result is a pandas Series with [status, suggested]
                 final_df.at[idx, 'PO_Name_Status'] = result.iloc[0]
                 final_df.at[idx, 'Suggested_PO_Name'] = result.iloc[1]
+            
+            # New Block: Set Suggested_URL based on priority order
+            logger.info("Setting Suggested_URL based on priority order (HOO_URL > URL > Ops_URL)...")
+            for idx, row in final_df.iterrows():
+                # Handle NaN/None values and strip whitespace
+                hoo_url = str(row.get('HOO_URL', '')).strip() if pd.notna(row.get('HOO_URL')) else ''
+                url = str(row.get('URL', '')).strip() if pd.notna(row.get('URL')) else ''
+                ops_url = str(row.get('Ops_URL', '')).strip() if pd.notna(row.get('Ops_URL')) else ''
+                
+                # Apply priority logic
+                if hoo_url:  # If HOO_URL has a non-empty value
+                    suggested_url = hoo_url
+                elif url:    # If URL has a non-empty value
+                    suggested_url = url
+                else:       # Otherwise use Ops_URL (even if empty)
+                    suggested_url = ops_url
+                
+                final_df.at[idx, 'Suggested_URL'] = suggested_url
+            
+            logger.info("Completed setting Suggested_URL values")
             
             # Save the updated DataFrame
             final_df.to_csv(final_path, index=False)

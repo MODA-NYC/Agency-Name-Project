@@ -203,6 +203,24 @@ def create_clean_export(df: pd.DataFrame) -> pd.DataFrame:
     
     return clean_df
 
+def assign_final_ids(df: pd.DataFrame, id_prefix: str = "FINAL_REC_") -> pd.DataFrame:
+    """
+    Generate stable, unique RecordIDs for each record in the final dataset.
+    The IDs are formatted as {id_prefix}{6-digit zero-padded index}.
+    This function should be called after all merging, cleaning, and matching steps
+    are complete, so that the final deduplicated dataset has consistent IDs for further processing.
+
+    Args:
+        df (pd.DataFrame): The clean, final deduplicated DataFrame.
+        id_prefix (str): The prefix for the ID (default "FINAL_REC_").
+        
+    Returns:
+        pd.DataFrame: The DataFrame with a new 'RecordID' column containing final unique IDs.
+    """
+    df = df.copy()
+    df["RecordID"] = df.index.map(lambda i: f"{id_prefix}{i:06d}")
+    return df
+
 def main(data_dir: str, log_level: str, display: bool, save: bool, apply_matches_flag: bool):
     # Ensure necessary directories exist
     os.makedirs(os.path.join(data_dir, 'analysis'), exist_ok=True)
@@ -398,8 +416,13 @@ def main(data_dir: str, log_level: str, display: bool, save: bool, apply_matches
         # Create and save the clean export (now includes computing new fields)
         clean_df = create_clean_export(merged_df)
         
+        # Assign final stable IDs to the clean dataset
+        clean_df = assign_final_ids(clean_df, id_prefix="FINAL_REC_")
+        logger.info(f"Assigned final stable IDs to {len(clean_df)} records")
+        
         # Remove unwanted fields and reorder columns for clean export
         keep_order = [
+            "RecordID",  # Add RecordID as first column
             "Name",
             "NameAlphabetized",
             "Name - HOO",

@@ -13,6 +13,7 @@ from preprocessing.global_normalization import apply_global_normalization
 
 # Import the apply_matches function from its module.
 from apply_matches import apply_matches
+import traceback
 
 def validate_dataframe_columns(df: pd.DataFrame, required_cols: List[str], df_name: str) -> None:
     """Validate that required columns exist in DataFrame."""
@@ -156,82 +157,49 @@ def apply_manual_overrides(final_df: pd.DataFrame) -> pd.DataFrame:
 
 def create_clean_export(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Creates a clean export by removing specified fields, renaming others, and computing new status fields.
-    
-    New fields computed:
-    - PO_Name_Status: Shows if HOO and Ops officer names match or displays the conflict
-    - URL_Status: Shows if all URLs match or displays the conflicts
-    - Suggested_URL: Prioritizes HOO_URL, then URL, then Ops_URL
-    - Suggested_PrincipalOfficerName: Uses Ops_PrincipalOfficerName if present, otherwise HOO_PrincipalOfficerName
+    Creates a clean export version of the dataset with standardized fields and handling of missing values.
     """
-    # Create a copy to avoid modifying the original
     clean_df = df.copy()
     
-    # Ensure proper handling of NaN values in officer names
-    clean_df['Ops_PrincipalOfficerName'] = clean_df['Ops_PrincipalOfficerName'].fillna('')
-    clean_df['HOO_PrincipalOfficerName'] = clean_df['HOO_PrincipalOfficerName'].fillna('')
-    
-    # PO Name Status - compare after stripping whitespace
-    clean_df["PO_Name_Status"] = clean_df.apply(lambda row: 
-        "match" if (str(row['HOO_PrincipalOfficerName']).strip() == 
-                   str(row['Ops_PrincipalOfficerName']).strip() and
-                   str(row['HOO_PrincipalOfficerName']).strip() != '')  # Only consider it a match if there's actually a value
-        else f"conflict: HOO: {str(row['HOO_PrincipalOfficerName']).strip()} | OPS: {str(row['Ops_PrincipalOfficerName']).strip()}", 
-        axis=1)
-    
-    # URL Status - compare after stripping whitespace
-    clean_df["URL_Status"] = clean_df.apply(lambda row:
-        "match" if (str(row.get("URL", "")).strip() == 
-                   str(row.get("Ops_URL", "")).strip() == 
-                   str(row.get("HeadOfOrganizationURL", "")).strip() and
-                   str(row.get("URL", "")).strip() != '')  # Only consider it a match if there's actually a value
-        else f"conflict: URL: {str(row.get('URL', '')).strip()} | HOO_URL: {str(row.get('HeadOfOrganizationURL', '')).strip()} | Ops_URL: {str(row.get('Ops_URL', '')).strip()}", 
-        axis=1)
-    
-    # Suggested URL (prioritize HOO_URL, then URL, then Ops_URL)
-    clean_df["Suggested_URL"] = clean_df.apply(lambda row:
-        str(row.get("HeadOfOrganizationURL", "")).strip() if pd.notna(row.get("HeadOfOrganizationURL")) and str(row.get("HeadOfOrganizationURL", "")).strip()
-        else (str(row.get("URL", "")).strip() if pd.notna(row.get("URL")) and str(row.get("URL", "")).strip()
-              else (str(row.get("Ops_URL", "")).strip() if pd.notna(row.get("Ops_URL")) 
-                    else "")), 
-        axis=1)
-    
-    # Suggested PrincipalOfficerName - Use Ops_PrincipalOfficerName if present, otherwise HOO_PrincipalOfficerName
-    clean_df["Suggested_PrincipalOfficerName"] = clean_df.apply(lambda row:
-        str(row['Ops_PrincipalOfficerName']).strip() if pd.notna(row['Ops_PrincipalOfficerName']) and str(row['Ops_PrincipalOfficerName']).strip()
-        else str(row['HOO_PrincipalOfficerName']).strip(),
-        axis=1)
-    
-    # Convert empty strings back to NaN for consistency
-    clean_df["Suggested_PrincipalOfficerName"] = clean_df["Suggested_PrincipalOfficerName"].replace('', pd.NA)
-    
-    # Fields to remove
-    fields_to_remove = [
-        'PrincipalOfficerName',
-        'PrincipalOfficerTitle',
-        'PrincipalOfficerGivenName',
-        'PrincipalOfficerFamilyName',
-        'NameNormalized',
-        'Agency Name',
-        'Entity type',
-        'source'
+    # Fill missing values with empty strings for string columns
+    string_columns = [
+        'Name', 'NameAlphabetized', 'OperationalStatus', 'PreliminaryOrganizationType',
+        'Description', 'URL', 'ParentOrganization', 'NYCReportingLine',
+        'AuthorizingAuthority', 'LegalCitation', 'LegalCitationURL', 'LegalCitationText',
+        'LegalName', 'AlternateNames', 'Acronym', 'AlternateAcronyms', 'BudgetCode',
+        'OpenDatasetsURL', 'Notes', 'URISlug', 'NameWithAcronym', 'NameAlphabetizedWithAcronym',
+        'RecordID', 'merged_from', 'data_source', 'Description-nyc.gov'
     ]
     
-    # Remove specified fields if they exist
-    for field in fields_to_remove:
-        if field in clean_df.columns:
-            clean_df = clean_df.drop(columns=[field])
+    # Add optional columns if they exist
+    optional_columns = [
+        'Ops_PrincipalOfficerName', 'Ops_URL', 'HOO_PrincipalOfficerName',
+        'HOO_PrincipalOfficerTitle', 'HOO_PrincipalOfficerContactURL',
+        'HOO_URL', 'Suggested_PrincipalOfficerName', 'PO_Name_Status',
+        'URL_Status', 'Suggested_URL', 'PO_Notes', 'URL_Notes'
+    ]
     
-    # Rename fields
-    field_renames = {
-        'HeadOfOrganizationName': 'HOO_PrincipalOfficerName',
-        'HeadOfOrganizationTitle': 'HOO_PrincipalOfficerTitle',
-        'PrincipalOfficerContactURL': 'HOO_PrincipalOfficerContactURL',
-        'HeadOfOrganizationURL': 'HOO_URL'
-    }
+    # Add existing optional columns to string_columns
+    for col in optional_columns:
+        if col in clean_df.columns:
+            string_columns.append(col)
     
-    # Rename fields if they exist
-    clean_df = clean_df.rename(columns={old: new for old, new in field_renames.items() if old in clean_df.columns})
+    # Fill missing values for string columns that exist in the DataFrame
+    for col in string_columns:
+        if col in clean_df.columns:
+            clean_df[col] = clean_df[col].fillna('')
+    
+    # Handle numeric columns if they exist
+    numeric_columns = ['FoundingYear', 'SunsetYear']
+    for col in numeric_columns:
+        if col in clean_df.columns:
+            clean_df[col] = pd.to_numeric(clean_df[col], errors='coerce')
+    
+    # Handle date columns if they exist
+    date_columns = ['DateCreated', 'DateModified', 'LastVerifiedDate']
+    for col in date_columns:
+        if col in clean_df.columns:
+            clean_df[col] = pd.to_datetime(clean_df[col], errors='coerce')
     
     return clean_df
 
@@ -301,6 +269,110 @@ def main(data_dir: str, log_level: str, display: bool, save: bool, apply_matches
         after_dedup = len(merged_df)
         logger.info(f"Removed {before_dedup - after_dedup} duplicate records based on RecordID.")
         
+        # --- New code block to merge NYC.gov descriptions ---
+        nyc_gov_agency_list_path = os.path.join(data_dir, 'raw', 'nyc_gov_agency_list.csv')
+        try:
+            nyc_gov_df = pd.read_csv(nyc_gov_agency_list_path)
+            if 'Name - NYC.gov Agency List' in nyc_gov_df.columns and 'Description-nyc.gov' in nyc_gov_df.columns:
+                nyc_gov_subset = nyc_gov_df[['Name - NYC.gov Agency List', 'Description-nyc.gov']]
+                merged_df = merged_df.merge(nyc_gov_subset, on='Name - NYC.gov Agency List', how='left')
+                logger.info("Merged NYC.gov descriptions into the dataset")
+            else:
+                logger.warning("NYC.gov agency list does not contain expected columns")
+        except Exception as e:
+            logger.error(f"Error merging NYC.gov descriptions: {e}")
+        # --- End of NYC.gov descriptions block ---
+
+        # --- New code block: Merge Phase2 Manual Adjustments ---
+        adjustments_path = os.path.join(data_dir, 'raw', 'phase2_manual_adjustments.csv')
+        try:
+            # Try different encodings
+            try:
+                adjustments_df = pd.read_csv(adjustments_path, encoding='utf-8')
+            except UnicodeDecodeError:
+                try:
+                    adjustments_df = pd.read_csv(adjustments_path, encoding='latin1')
+                except UnicodeDecodeError:
+                    adjustments_df = pd.read_csv(adjustments_path, encoding='cp1252')
+            
+            logger.info(f"Loaded {len(adjustments_df)} records from phase2_manual_adjustments.csv")
+            
+            # Normalize names for matching by converting to lowercase and stripping whitespace
+            merged_df['Name_normalized'] = merged_df['Name'].str.lower().str.strip()
+            adjustments_df['Name_normalized'] = adjustments_df['Name'].str.lower().str.strip()
+            
+            # Define fields to update from adjustments
+            fields_to_update = {
+                'OperationalStatus_Confirmed': 'OperationalStatus',
+                'PreliminaryOrganizationType_Confirmed': 'PreliminaryOrganizationType',
+                'NameAlphabetized_Confirmed': 'NameAlphabetized',
+                'URL_Confirmed': 'URL',
+                'PrincipalOfficerName_Confirmed': 'PrincipalOfficerName',
+                'HOO_URL': 'HOO_URL',  # Direct field mapping
+                'Ops_URL': 'Ops_URL',  # Direct field mapping
+                'HOO_PrincipalOfficerName': 'HOO_PrincipalOfficerName',  # Direct field mapping
+                'Ops_PrincipalOfficerName': 'Ops_PrincipalOfficerName',  # Direct field mapping
+                'PO_Notes': 'PO_Notes',  # Direct field mapping
+                'URL Notes': 'URL_Notes'  # Note the space in source column
+            }
+            
+            # Get all columns from adjustments_df that end with _Confirmed and aren't already mapped
+            additional_confirmed_fields = [col for col in adjustments_df.columns 
+                                        if col.endswith('_Confirmed') 
+                                        and col not in fields_to_update]
+            
+            for field in additional_confirmed_fields:
+                target_field = field.replace('_Confirmed', '')
+                fields_to_update[field] = target_field
+            
+            logger.info(f"Fields to update from adjustments: {', '.join(fields_to_update.keys())}")
+            
+            # Prepare columns for merge
+            merge_columns = ['Name_normalized']
+            for source_field in fields_to_update.keys():
+                if source_field in adjustments_df.columns:
+                    merge_columns.append(source_field)
+                else:
+                    logger.warning(f"Column {source_field} not found in adjustments file")
+            
+            # Join adjustments_df with merged_df on the normalized name field
+            before_merge = len(merged_df)
+            merged_df = merged_df.merge(
+                adjustments_df[merge_columns],
+                on='Name_normalized',
+                how='left'
+            )
+            
+            # Update fields with confirmed values where available
+            updates_made = 0
+            for source_field, target_field in fields_to_update.items():
+                if source_field not in merged_df.columns:
+                    continue
+                    
+                # Create target field if it doesn't exist
+                if target_field not in merged_df.columns:
+                    merged_df[target_field] = None
+                    logger.info(f"Created new field: {target_field}")
+                
+                # Convert values to strings for comparison, handling NaN values
+                mask = merged_df[source_field].notna() & (merged_df[source_field].astype(str).str.strip() != '')
+                if mask.any():
+                    # Update the target field where we have confirmed values
+                    merged_df.loc[mask, target_field] = merged_df.loc[mask, source_field]
+                    updates_made += mask.sum()
+                    logger.info(f"Updated {mask.sum()} records for {target_field} from {source_field}")
+            
+            logger.info(f"Total updates made from phase2_manual_adjustments.csv: {updates_made}")
+            
+            # Drop the temporary columns
+            columns_to_drop = ['Name_normalized'] + [col for col in fields_to_update.keys() if col in merged_df.columns]
+            merged_df = merged_df.drop(columns_to_drop, axis=1)
+            
+        except Exception as e:
+            logger.error(f"Error merging phase2 manual adjustments: {e}")
+            logger.error(traceback.format_exc())
+        # --- End of Phase2 Manual Adjustments block ---
+
         # Apply manual override mappings to adjust final names and acronyms
         merged_df = apply_manual_overrides(merged_df)
         
@@ -322,20 +394,6 @@ def main(data_dir: str, log_level: str, display: bool, save: bool, apply_matches
             merged_df = pd.read_csv(full_export_path)
         else:
             logger.info("Skipping match application (--skip-matches flag was set)")
-            
-        # --- New code block to merge NYC.gov descriptions ---
-        nyc_gov_agency_list_path = os.path.join(data_dir, 'raw', 'nyc_gov_agency_list.csv')
-        try:
-            nyc_gov_df = pd.read_csv(nyc_gov_agency_list_path)
-            if 'Name - NYC.gov Agency List' in nyc_gov_df.columns and 'Description-nyc.gov' in nyc_gov_df.columns:
-                nyc_gov_subset = nyc_gov_df[['Name - NYC.gov Agency List', 'Description-nyc.gov']]
-                merged_df = merged_df.merge(nyc_gov_subset, on='Name - NYC.gov Agency List', how='left')
-                logger.info("Merged NYC.gov descriptions into the dataset")
-            else:
-                logger.warning("NYC.gov agency list does not contain expected columns")
-        except Exception as e:
-            logger.error(f"Error merging NYC.gov descriptions: {e}")
-        # --- End of new code block ---
             
         # Create and save the clean export (now includes computing new fields)
         clean_df = create_clean_export(merged_df)

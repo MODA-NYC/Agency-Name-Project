@@ -39,4 +39,36 @@
 ### Future Considerations
 - Consider maintaining a lookup table of common variations
 - Implement machine learning for pattern recognition
-- Add context-aware normalization based on agency type 
+- Add context-aware normalization based on agency type
+
+## Future ID Assignment System
+
+### Source-Level ID Management
+- Implement unique ID assignment at data source ingestion
+- Create consistent ID format across all data sources
+- Maintain ID history for tracking changes over time
+
+### ID Format Improvements
+- Consider hierarchical ID structure to reflect agency relationships
+- Add metadata in ID format (e.g., source identifier prefix)
+- Implement checksum/validation in ID structure
+
+### ID Management System
+- Build centralized ID registry for all agency records
+- Implement ID reservation system for new agencies
+- Create API for ID lookup and validation
+
+### Data Quality Controls
+- Automated ID sequence validation
+- Duplicate ID detection
+- ID format validation rules
+
+### Migration Strategy
+- Plan gradual transition from FINAL_REC_XXXXXX format
+- Create mapping between old and new ID systems
+- Maintain backward compatibility during transition
+
+### Future Considerations
+- Consider UUID or other globally unique ID formats
+- Plan for integration with NYC Open Data ID systems
+- Design for scalability and future agency reorganizations 

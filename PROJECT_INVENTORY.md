@@ -27,6 +27,7 @@
 - `src/data_merging.py` - Core data merging functionality
 - `src/data_preparation.py` - Data preparation utilities
 - `src/data_loading.py` - Data loading utilities
+- `src/assign_final_ids.py` - Final ID assignment and cleanup for Phase 2.6
 
 ### Preprocessing
 - `src/preprocessing/base_processor.py` - Base class for data processors
@@ -53,6 +54,8 @@
 - `src/analysis/analyze_data_quality.py` - Data quality analysis
 - `src/analysis/match_quality_report.py` - Match quality reporting
 - `src/analysis/name_transformation_analyzer.py` - Name transformation analysis
+- `src/analysis/id_assignment_report.py` - Reports on ID assignment and crosswalk validation
+- `src/analysis/final_cleanup_report.py` - Analysis of Phase 2.6 cleanup results
 
 ### Testing
 - `src/tests/test_match_generation.py` - Match generation tests
@@ -87,6 +90,8 @@
 - `data/processed/nyc_agencies_export.csv` - Final agency export
 - `data/processed/global_normalized_dataset.csv` - Globally normalized dataset
 - `data/processed/final_deduplicated_dataset.csv` - Final deduplicated output
+- `data/processed/id_crosswalk.csv` - Mapping between source IDs and final IDs
+- `data/processed/final_cleaned_dataset.csv` - Phase 2.6 cleaned dataset with new IDs
 
 ### Analysis Data
 - `data/analysis/verified_matches_summary.json` - Match verification summary

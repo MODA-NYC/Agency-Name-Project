@@ -196,3 +196,47 @@ The project uses `main.py` as the central orchestrator for all data processing s
 
 3. **Ongoing QA**  
    - Plan for periodic reviews to address new name variants, updated acronyms, or new agencies.
+
+## Milestones & High-Level Timeline
+
+| Milestone | Description | Estimated Completion |
+|-----------|-------------|---------------------|
+| M1: Data Loading & Preprocessing  | Finish integrating `nyc_gov_hoo.csv` and `ops_data.csv` processors; ensure standardized schemas | Week 1 |
+| M2: Enhanced Normalization Rules  | Apply advanced normalization (NYC references, abbreviations, mayor's office formatting) | Week 2 |
+| M3: Fuzzy Matching & Threshold Tuning | Refine similarity scoring (Levenshtein/Jaro-Winkler), document thresholds, and run initial match tests | Week 3 |
+| M4: Deduplication & Provenance Tracking | Deduplicate integrated dataset, retain `RecordID` and source columns; perform final merges | Week 4 |
+| M5: Analysis & Reporting  | Generate final validation reports, missing record analyses, and confirm final dataset integrity | Week 5 |
+| M6: Schema & Data Dictionary Updates | Finalize schema adjustments, update `data_dictionary.csv`, and ensure continuous CI testing | Week 6 |
+| M7: Final Cleanup & ID Assignment | Implement final cleanup phase, assign stable unique IDs, and prepare for future systematic ID assignment | Week 7 |
+
+## Detailed Tasks
+
+### Data Preprocessing (Weeks 1–2)
+- **Task A1:** Integrate `nyc_gov_hoo.csv` and `ops_data.csv` processors.
+- **Task A2:** Ensure standardized schemas for all processed sources.
+
+### Matching & Deduplication (Weeks 2–4)
+- **Task B1:** Refine similarity scoring (Levenshtein/Jaro-Winkler).
+- **Task B2:** Document thresholds and run initial match tests.
+- **Task B3:** Deduplicate integrated dataset, retain `RecordID` and source columns.
+- **Task B4:** Perform final merges.
+
+### Analysis & Validation (Weeks 4–5)
+- **Task C1:** Generate final validation reports.
+- **Task C2:** Analyze missing records and confirm final dataset integrity.
+
+### Schema & Documentation Updates (Weeks 5–6)
+- **Task D1:** Finalize schema adjustments.
+- **Task D2:** Update `data_dictionary.csv`.
+- **Task D3:** Ensure continuous CI testing.
+
+### Final Cleanup & ID Assignment (Week 7)
+- **Task E1:** Implement final deduplication pass in `cleanup_matches.py` to resolve remaining duplicates and naming conflicts.
+- **Task E2:** Create new ID assignment logic in `assign_final_ids.py` to generate stable "FINAL_REC_XXXXXX" IDs.
+- **Task E3:** Update export process to use new IDs and document ID assignment methodology.
+- **Task E4:** Create crosswalk between original source IDs and new final IDs for traceability.
+- **Task E5:** Document limitations of current ID system and requirements for future systematic ID assignment.
+
+## Script Consolidation Plans
+- **Plan P1:** Consolidate all scripts into a single main.py file for easier management and execution.
+- **Plan P2:** Implement a modular architecture for easy addition of new sources or changes to existing ones.

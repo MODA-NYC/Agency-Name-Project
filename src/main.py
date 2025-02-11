@@ -323,6 +323,20 @@ def main(data_dir: str, log_level: str, display: bool, save: bool, apply_matches
         else:
             logger.info("Skipping match application (--skip-matches flag was set)")
             
+        # --- New code block to merge NYC.gov descriptions ---
+        nyc_gov_agency_list_path = os.path.join(data_dir, 'raw', 'nyc_gov_agency_list.csv')
+        try:
+            nyc_gov_df = pd.read_csv(nyc_gov_agency_list_path)
+            if 'Name - NYC.gov Agency List' in nyc_gov_df.columns and 'Description-nyc.gov' in nyc_gov_df.columns:
+                nyc_gov_subset = nyc_gov_df[['Name - NYC.gov Agency List', 'Description-nyc.gov']]
+                merged_df = merged_df.merge(nyc_gov_subset, on='Name - NYC.gov Agency List', how='left')
+                logger.info("Merged NYC.gov descriptions into the dataset")
+            else:
+                logger.warning("NYC.gov agency list does not contain expected columns")
+        except Exception as e:
+            logger.error(f"Error merging NYC.gov descriptions: {e}")
+        # --- End of new code block ---
+            
         # Create and save the clean export (now includes computing new fields)
         clean_df = create_clean_export(merged_df)
         clean_export_path = os.path.join(data_dir, 'exports', 'clean_dataset.csv')

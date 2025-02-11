@@ -1,26 +1,21 @@
 #!/usr/bin/env python
 """
-Phase 2.6 Manual Merge Script
+Phase 2.6 Manual Merge and Final Export Script
 
-This script reads a CSV file containing manual merge instructions (manual_overrides.csv)
-and applies manual merge operations on the final deduplicated dataset.
-
-The manual_overrides.csv file should have columns:
-  - PrimaryRecordID: The RecordID of the primary record (to keep)
-  - SecondaryRecordID: The RecordID of the secondary record (to merge into the primary)
-
-Merge Logic:
-  1. Keep the primary record's Name
-  2. For each other field (except RecordID and Name):
-     - If primary is blank and secondary is not, update primary with secondary's value
-  3. For the Acronym field:
-     - If secondary has an Acronym, add it to primary's AlternateAcronyms
-     - If AlternateAcronyms is blank, set to secondary's Acronym
-     - If populated, append with "; " separator
-  4. Update manual_merge_history on primary to record secondary's RecordID
-  5. Remove secondary record from dataset
-
-The updated dataset is saved as "final_deduplicated_dataset_manual_merged.csv"
+This script:
+1. Reads manual merge instructions from data/manual_overrides.csv.
+2. Loads the final deduplicated dataset (from the clean dataset export).
+3. Applies manual merge operations:
+   - For each pair (PrimaryRecordID, SecondaryRecordID), merge secondary into primary.
+   - Use field-level logic: preserve primary name, update blank fields, and merge Acronym into AlternateAcronyms.
+   - Track manual merge history.
+4. After merging, export the updated dataset in two forms:
+   - The full dataset export (all fields) to data/exports/full_dataset.csv.
+   - A clean dataset export:
+       - Generate a cleaned version using create_clean_export() function.
+       - Assign final stable IDs (format: FINAL_REC_XXXXXX).
+       - Reorder columns as specified.
+       - Save to data/exports/clean_dataset.csv and also to data/processed/final_deduplicated_dataset_manual_merged.csv.
 """
 
 import os
@@ -29,6 +24,7 @@ import logging
 import pandas as pd
 from pathlib import Path
 from typing import Tuple, Optional, Dict, List
+import argparse
 
 # Configure logging
 logging.basicConfig(
@@ -40,9 +36,78 @@ logger = logging.getLogger(__name__)
 # File paths
 DATA_DIR = Path("data")
 PROCESSED_DIR = DATA_DIR / "processed"
+EXPORTS_DIR = DATA_DIR / "exports"
 INPUT_DATASET = PROCESSED_DIR / "final_deduplicated_dataset.csv"
 MANUAL_OVERRIDES = DATA_DIR / "manual_overrides.csv"
-OUTPUT_DATASET = PROCESSED_DIR / "final_deduplicated_dataset_manual_merged.csv"
+OUTPUT_MANUAL_MERGED = PROCESSED_DIR / "final_deduplicated_dataset_manual_merged.csv"
+FULL_EXPORT_PATH = EXPORTS_DIR / "full_dataset.csv"
+CLEAN_EXPORT_PATH = EXPORTS_DIR / "clean_dataset.csv"
+
+def create_clean_export(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Creates a clean export version of the dataset with standardized fields and handling of missing values.
+    """
+    clean_df = df.copy()
+    
+    # Fill missing values with empty strings for string columns
+    string_columns = [
+        'Name', 'NameAlphabetized', 'OperationalStatus', 'PreliminaryOrganizationType',
+        'Description', 'URL', 'ParentOrganization', 'NYCReportingLine',
+        'AuthorizingAuthority', 'LegalCitation', 'LegalCitationURL', 'LegalCitationText',
+        'LegalName', 'AlternateNames', 'Acronym', 'AlternateAcronyms', 'BudgetCode',
+        'OpenDatasetsURL', 'Notes', 'URISlug', 'NameWithAcronym', 'NameAlphabetizedWithAcronym',
+        'RecordID', 'merged_from', 'data_source', 'Description-nyc.gov'
+    ]
+    
+    # Add optional columns if they exist
+    optional_columns = [
+        'Ops_PrincipalOfficerName', 'Ops_URL', 'HOO_PrincipalOfficerName',
+        'HOO_PrincipalOfficerTitle', 'HOO_PrincipalOfficerContactURL',
+        'HOO_URL', 'Suggested_PrincipalOfficerName', 'PO_Name_Status',
+        'URL_Status', 'Suggested_URL', 'PO_Notes', 'URL_Notes'
+    ]
+    
+    # Add existing optional columns to string_columns
+    for col in optional_columns:
+        if col in clean_df.columns:
+            string_columns.append(col)
+    
+    # Fill missing values for string columns that exist in the DataFrame
+    for col in string_columns:
+        if col in clean_df.columns:
+            clean_df[col] = clean_df[col].fillna('')
+    
+    # Handle numeric columns if they exist
+    numeric_columns = ['FoundingYear', 'SunsetYear']
+    for col in numeric_columns:
+        if col in clean_df.columns:
+            clean_df[col] = pd.to_numeric(clean_df[col], errors='coerce')
+    
+    # Handle date columns if they exist
+    date_columns = ['DateCreated', 'DateModified', 'LastVerifiedDate']
+    for col in date_columns:
+        if col in clean_df.columns:
+            clean_df[col] = pd.to_datetime(clean_df[col], errors='coerce')
+    
+    return clean_df
+
+def assign_final_ids(df: pd.DataFrame, id_prefix: str = "FINAL_REC_") -> pd.DataFrame:
+    """
+    Generate stable, unique RecordIDs for each record in the final dataset.
+    The IDs are formatted as {id_prefix}{6-digit zero-padded index}.
+    This function should be called after all merging, cleaning, and matching steps
+    are complete, so that the final deduplicated dataset has consistent IDs for further processing.
+
+    Args:
+        df (pd.DataFrame): The clean, final deduplicated DataFrame.
+        id_prefix (str): The prefix for the ID (default "FINAL_REC_").
+        
+    Returns:
+        pd.DataFrame: The DataFrame with a new 'RecordID' column containing final unique IDs.
+    """
+    df = df.copy()
+    df["RecordID"] = df.index.map(lambda i: f"{id_prefix}{i:06d}")
+    return df
 
 def merge_records(primary: pd.Series, secondary: pd.Series) -> pd.Series:
     """
@@ -183,9 +248,64 @@ def apply_manual_merges(df: pd.DataFrame, overrides_df: pd.DataFrame) -> Tuple[p
     
     return result_df, stats
 
+def export_datasets(df: pd.DataFrame):
+    """
+    Export the full dataset and the clean export.
+    """
+    # Create exports directory if it doesn't exist
+    EXPORTS_DIR.mkdir(parents=True, exist_ok=True)
+    
+    # Save the full dataset with all fields
+    df.to_csv(FULL_EXPORT_PATH, index=False)
+    logger.info(f"Full dataset export saved to {FULL_EXPORT_PATH}. Row count: {len(df)}")
+    
+    # Create a clean export: process the dataset, assign final IDs, reorder columns
+    clean_df = create_clean_export(df)
+    clean_df = assign_final_ids(clean_df, id_prefix="FINAL_REC_")
+    logger.info(f"Assigned final stable IDs to {len(clean_df)} records")
+    
+    # Define column order for clean export
+    keep_order = [
+        "RecordID",  # Add RecordID as first column
+        "Name",
+        "NameAlphabetized",
+        "Name - HOO",
+        "OperationalStatus",
+        "PreliminaryOrganizationType",
+        "Description",
+        "URL",
+        "AlternateNames",
+        "Acronym",
+        "AlternateAcronyms",
+        "BudgetCode",
+        "OpenDatasetsURL",
+        "FoundingYear",
+        "PrincipalOfficerName",
+        "PrincipalOfficerTitle",
+        "PrincipalOfficerContactURL",
+        "Name - CPO",
+        "Name - Checkbook",
+        "Name - Greenbook",
+        "Name - NYC Open Data Portal",
+        "Name - NYC.gov Agency List",
+        "Name - NYC.gov Mayor's Office",
+        "Name - ODA",
+        "Name - Ops",
+        "Name - WeGov"
+    ]
+    clean_df = clean_df.reindex(columns=keep_order)
+    
+    # Save clean export
+    clean_df.to_csv(CLEAN_EXPORT_PATH, index=False)
+    logger.info(f"Clean dataset export saved to {CLEAN_EXPORT_PATH}. Row count: {len(clean_df)}")
+    
+    # Also save the clean export as the final manual merged dataset for backward compatibility
+    clean_df.to_csv(OUTPUT_MANUAL_MERGED, index=False)
+    logger.info(f"Clean dataset also saved to {OUTPUT_MANUAL_MERGED} for backward compatibility")
+
 def main():
     """Main execution function"""
-    logger.info("Starting Phase 2.6 Manual Merge process")
+    logger.info("Starting Phase 2.6 Manual Merge and Export Process")
     
     # Validate input files
     valid, error_msg = validate_input_files()
@@ -202,6 +322,10 @@ def main():
         logger.info(f"Loaded {len(df)} records from input dataset")
         logger.info(f"Loaded {len(overrides_df)} manual merge instructions")
         
+        # First assign final record IDs
+        logger.info("Assigning final record IDs...")
+        df = assign_final_ids(df, id_prefix="FINAL_REC_")
+        
         # Apply manual merges
         updated_df, stats = apply_manual_merges(df, overrides_df)
         
@@ -217,15 +341,17 @@ def main():
             for error in stats['errors']:
                 logger.info(f"- {error}")
         
-        # Save updated dataset
-        logger.info(f"\nSaving updated dataset to {OUTPUT_DATASET}")
-        PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
-        updated_df.to_csv(OUTPUT_DATASET, index=False)
-        logger.info("Manual merge process completed successfully")
+        # Export final datasets (full and clean exports)
+        export_datasets(updated_df)
+        
+        logger.info("Phase 2.6 Manual Merge and Export Process completed successfully")
         
     except Exception as e:
         logger.error(f"Error during manual merge process: {e}")
         raise
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Apply manual merge instructions and export final datasets.")
+    parser.add_argument('--log-level', type=str, default='INFO', help='Logging level')
+    args = parser.parse_args()
     main() 

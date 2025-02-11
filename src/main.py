@@ -397,11 +397,41 @@ def main(data_dir: str, log_level: str, display: bool, save: bool, apply_matches
             
         # Create and save the clean export (now includes computing new fields)
         clean_df = create_clean_export(merged_df)
+        
+        # Remove unwanted fields and reorder columns for clean export
+        keep_order = [
+            "Name",
+            "NameAlphabetized",
+            "Name - HOO",
+            "OperationalStatus",
+            "PreliminaryOrganizationType",
+            "Description",
+            "URL",
+            "AlternateNames",
+            "Acronym",
+            "AlternateAcronyms",
+            "BudgetCode",
+            "OpenDatasetsURL",
+            "FoundingYear",
+            "PrincipalOfficerName",
+            "PrincipalOfficerTitle",
+            "PrincipalOfficerContactURL",
+            "Name - CPO",
+            "Name - Checkbook",
+            "Name - Greenbook",
+            "Name - NYC Open Data Portal",
+            "Name - NYC.gov Agency List",
+            "Name - NYC.gov Mayor's Office",
+            "Name - ODA",
+            "Name - Ops",
+            "Name - WeGov"
+        ]
+        clean_df = clean_df.reindex(columns=keep_order)
+        
         clean_export_path = os.path.join(data_dir, 'exports', 'clean_dataset.csv')
         clean_df.to_csv(clean_export_path, index=False)
         logger.info(f"Clean dataset saved to {clean_export_path}. Row count: {len(clean_df)}")
         
-        # For backward compatibility, also save the clean version as final_deduplicated_dataset.csv
         final_path = os.path.join(data_dir, 'processed', 'final_deduplicated_dataset.csv')
         clean_df.to_csv(final_path, index=False)
         logger.info(f"Clean dataset also saved to {final_path} for backward compatibility")

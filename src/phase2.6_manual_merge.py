@@ -248,6 +248,68 @@ def apply_manual_merges(df: pd.DataFrame, overrides_df: pd.DataFrame) -> Tuple[p
     
     return result_df, stats
 
+def apply_single_record_updates(df: pd.DataFrame, overrides_df: pd.DataFrame) -> Tuple[pd.DataFrame, Dict]:
+    """
+    Apply single-record updates from the manual overrides file.
+    These are records where we want to update fields without merging with another record.
+    
+    Args:
+        df: Input DataFrame to update
+        overrides_df: DataFrame containing update instructions
+        
+    Returns:
+        Tuple of (updated DataFrame, statistics dictionary)
+    """
+    stats = {
+        'total_updates': 0,
+        'successful_updates': 0,
+        'failed_updates': 0,
+        'errors': []
+    }
+    
+    # Create working copy of the dataset
+    result_df = df.copy()
+    
+    # Process each update instruction that has no SecondaryRecordID
+    for idx, row in overrides_df[overrides_df['SecondaryRecordID'].isna()].iterrows():
+        primary_id = str(row['PrimaryRecordID'])
+        stats['total_updates'] += 1
+        
+        try:
+            # Find the record
+            record_mask = result_df['RecordID'] == primary_id
+            
+            if not record_mask.any():
+                raise ValueError(f"Record {primary_id} not found")
+            
+            # Apply updates based on Notes field
+            if pd.notna(row.get('Notes')):
+                update_instructions = json.loads(row['Notes'])
+                
+                for field, value in update_instructions.items():
+                    if field == 'AlternateNames':
+                        # Special handling for AlternateNames - append to existing
+                        current_value = result_df.loc[record_mask, field].iloc[0]
+                        if pd.isna(current_value) or current_value == '':
+                            new_value = value
+                        else:
+                            new_value = f"{current_value}; {value}"
+                        result_df.loc[record_mask, field] = new_value
+                    else:
+                        # Direct update for other fields
+                        result_df.loc[record_mask, field] = value
+            
+            stats['successful_updates'] += 1
+            logger.info(f"Successfully updated record {primary_id}")
+            
+        except Exception as e:
+            stats['failed_updates'] += 1
+            error_msg = f"Error updating {primary_id}: {str(e)}"
+            stats['errors'].append(error_msg)
+            logger.error(error_msg)
+    
+    return result_df, stats
+
 def export_datasets(df: pd.DataFrame):
     """
     Export the full dataset and the clean export.
@@ -320,25 +382,36 @@ def main():
         overrides_df = pd.read_csv(MANUAL_OVERRIDES)
         
         logger.info(f"Loaded {len(df)} records from input dataset")
-        logger.info(f"Loaded {len(overrides_df)} manual merge instructions")
+        logger.info(f"Loaded {len(overrides_df)} manual override instructions")
         
         # First assign final record IDs
         logger.info("Assigning final record IDs...")
         df = assign_final_ids(df, id_prefix="FINAL_REC_")
         
-        # Apply manual merges
-        updated_df, stats = apply_manual_merges(df, overrides_df)
+        # Apply single-record updates first
+        logger.info("Applying single-record updates...")
+        df, update_stats = apply_single_record_updates(df, overrides_df)
+        
+        # Then apply manual merges for records that need to be merged
+        logger.info("Applying manual merges...")
+        merge_overrides = overrides_df[overrides_df['SecondaryRecordID'].notna()]
+        updated_df, merge_stats = apply_manual_merges(df, merge_overrides)
         
         # Log statistics
+        logger.info("\nUpdate Statistics:")
+        logger.info(f"Total single-record updates: {update_stats['total_updates']}")
+        logger.info(f"Successful updates: {update_stats['successful_updates']}")
+        logger.info(f"Failed updates: {update_stats['failed_updates']}")
+        
         logger.info("\nMerge Statistics:")
-        logger.info(f"Total merge instructions: {stats['total_instructions']}")
-        logger.info(f"Successful merges: {stats['successful_merges']}")
-        logger.info(f"Failed merges: {stats['failed_merges']}")
+        logger.info(f"Total merge instructions: {merge_stats['total_instructions']}")
+        logger.info(f"Successful merges: {merge_stats['successful_merges']}")
+        logger.info(f"Failed merges: {merge_stats['failed_merges']}")
         logger.info(f"Records in final dataset: {len(updated_df)}")
         
-        if stats['errors']:
+        if update_stats['errors'] or merge_stats['errors']:
             logger.info("\nErrors encountered:")
-            for error in stats['errors']:
+            for error in update_stats['errors'] + merge_stats['errors']:
                 logger.info(f"- {error}")
         
         # Export final datasets (full and clean exports)

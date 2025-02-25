@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 DATA_DIR = Path("data")
 PROCESSED_DIR = DATA_DIR / "processed"
 EXPORTS_DIR = DATA_DIR / "exports"
-INPUT_DATASET = PROCESSED_DIR / "final_deduplicated_dataset.csv"
+INPUT_DATASET = EXPORTS_DIR / "clean_dataset.csv"
 MANUAL_OVERRIDES = DATA_DIR / "manual_overrides.csv"
 OUTPUT_MANUAL_MERGED = PROCESSED_DIR / "final_deduplicated_dataset_manual_merged.csv"
 FULL_EXPORT_PATH = EXPORTS_DIR / "full_dataset.csv"
@@ -93,20 +93,54 @@ def create_clean_export(df: pd.DataFrame) -> pd.DataFrame:
 
 def assign_final_ids(df: pd.DataFrame, id_prefix: str = "FINAL_REC_") -> pd.DataFrame:
     """
-    Generate stable, unique RecordIDs for each record in the final dataset.
+    Generate stable, unique RecordIDs for each record in the final dataset, preserving existing IDs.
     The IDs are formatted as {id_prefix}{6-digit zero-padded index}.
-    This function should be called after all merging, cleaning, and matching steps
-    are complete, so that the final deduplicated dataset has consistent IDs for further processing.
+    This function preserves existing IDs that match the prefix pattern and only generates
+    new IDs for records that don't have them.
 
     Args:
         df (pd.DataFrame): The clean, final deduplicated DataFrame.
         id_prefix (str): The prefix for the ID (default "FINAL_REC_").
         
     Returns:
-        pd.DataFrame: The DataFrame with a new 'RecordID' column containing final unique IDs.
+        pd.DataFrame: The DataFrame with a 'RecordID' column containing final unique IDs.
     """
     df = df.copy()
-    df["RecordID"] = df.index.map(lambda i: f"{id_prefix}{i:06d}")
+    
+    # Check if RecordID column exists, if not create it
+    if 'RecordID' not in df.columns:
+        logger.info("RecordID column not found, creating it...")
+        df['RecordID'] = ""
+    
+    # Helper function to check if a RecordID follows the expected pattern
+    def has_valid_id(record_id):
+        if pd.isna(record_id) or not isinstance(record_id, str):
+            return False
+        return record_id.startswith(id_prefix) and len(record_id) == len(id_prefix) + 6 and record_id[len(id_prefix):].isdigit()
+    
+    # Identify records that already have valid IDs
+    has_valid_id_mask = df['RecordID'].apply(has_valid_id)
+    valid_id_count = has_valid_id_mask.sum()
+    logger.info(f"Found {valid_id_count} records with valid IDs that will be preserved")
+    
+    # Find the highest existing ID number to continue from
+    max_id_num = 0
+    if has_valid_id_mask.any():
+        existing_ids = df.loc[has_valid_id_mask, 'RecordID']
+        existing_nums = [int(id[len(id_prefix):]) for id in existing_ids if has_valid_id(id)]
+        if existing_nums:
+            max_id_num = max(existing_nums)
+            logger.info(f"Highest existing ID number: {max_id_num}")
+    
+    # Generate new IDs only for records that need them
+    next_id = max_id_num + 1
+    new_id_count = (~has_valid_id_mask).sum()
+    if new_id_count > 0:
+        logger.info(f"Generating new IDs for {new_id_count} records starting from {id_prefix}{next_id:06d}")
+        for idx in df[~has_valid_id_mask].index:
+            df.loc[idx, 'RecordID'] = f"{id_prefix}{next_id:06d}"
+            next_id += 1
+    
     return df
 
 def merge_records(primary: pd.Series, secondary: pd.Series) -> pd.Series:
@@ -208,6 +242,13 @@ def apply_manual_merges(df: pd.DataFrame, overrides_df: pd.DataFrame) -> Tuple[p
     # Create working copy of the dataset
     result_df = df.copy()
     
+    # Verify RecordID column exists
+    if 'RecordID' not in result_df.columns:
+        error_msg = "RecordID column missing from dataset. Cannot apply merges."
+        logger.error(error_msg)
+        stats['errors'].append(error_msg)
+        return result_df, stats
+    
     # Process each merge instruction
     for idx, row in overrides_df.iterrows():
         primary_id = str(row['PrimaryRecordID'])
@@ -219,9 +260,20 @@ def apply_manual_merges(df: pd.DataFrame, overrides_df: pd.DataFrame) -> Tuple[p
             secondary_mask = result_df['RecordID'] == secondary_id
             
             if not primary_mask.any():
-                raise ValueError(f"Primary record {primary_id} not found")
+                # If we can't find the primary record, log the error and continue
+                error_msg = f"Primary record {primary_id} not found by ID, merge will be skipped"
+                logger.warning(error_msg)
+                stats['failed_merges'] += 1
+                stats['errors'].append(error_msg)
+                continue
+                
             if not secondary_mask.any():
-                raise ValueError(f"Secondary record {secondary_id} not found")
+                # If we can't find the secondary record, log the error and continue
+                error_msg = f"Secondary record {secondary_id} not found by ID, merge will be skipped"
+                logger.warning(error_msg)
+                stats['failed_merges'] += 1
+                stats['errors'].append(error_msg)
+                continue
             
             # Get the records
             primary_record = result_df[primary_mask].iloc[0]
@@ -270,6 +322,13 @@ def apply_single_record_updates(df: pd.DataFrame, overrides_df: pd.DataFrame) ->
     # Create working copy of the dataset
     result_df = df.copy()
     
+    # Verify RecordID column exists
+    if 'RecordID' not in result_df.columns:
+        error_msg = "RecordID column missing from dataset. Cannot apply updates."
+        logger.error(error_msg)
+        stats['errors'].append(error_msg)
+        return result_df, stats
+    
     # Process each update instruction that has no SecondaryRecordID
     for idx, row in overrides_df[overrides_df['SecondaryRecordID'].isna()].iterrows():
         primary_id = str(row['PrimaryRecordID'])
@@ -280,7 +339,12 @@ def apply_single_record_updates(df: pd.DataFrame, overrides_df: pd.DataFrame) ->
             record_mask = result_df['RecordID'] == primary_id
             
             if not record_mask.any():
-                raise ValueError(f"Record {primary_id} not found")
+                # If we can't find the record by ID, log the error but continue
+                error_msg = f"Record {primary_id} not found by ID, update will be skipped"
+                logger.warning(error_msg)
+                stats['failed_updates'] += 1
+                stats['errors'].append(error_msg)
+                continue
             
             # Apply updates based on Notes field
             if pd.notna(row.get('Notes')):
@@ -384,11 +448,12 @@ def main():
         logger.info(f"Loaded {len(df)} records from input dataset")
         logger.info(f"Loaded {len(overrides_df)} manual override instructions")
         
-        # First assign final record IDs
-        logger.info("Assigning final record IDs...")
-        df = assign_final_ids(df, id_prefix="FINAL_REC_")
+        # Verify RecordID column exists in the input dataset
+        if 'RecordID' not in df.columns:
+            logger.error("Error: RecordID column not found in input dataset. Please use a dataset that already has record IDs.")
+            return
         
-        # Apply single-record updates first
+        # First apply single-record updates (using existing record IDs)
         logger.info("Applying single-record updates...")
         df, update_stats = apply_single_record_updates(df, overrides_df)
         
@@ -396,6 +461,10 @@ def main():
         logger.info("Applying manual merges...")
         merge_overrides = overrides_df[overrides_df['SecondaryRecordID'].notna()]
         updated_df, merge_stats = apply_manual_merges(df, merge_overrides)
+        
+        # Last step: ensure all records have valid IDs (preserving existing ones)
+        logger.info("Ensuring all records have valid Record IDs (preserving existing IDs)...")
+        updated_df = assign_final_ids(updated_df, id_prefix="FINAL_REC_")
         
         # Log statistics
         logger.info("\nUpdate Statistics:")

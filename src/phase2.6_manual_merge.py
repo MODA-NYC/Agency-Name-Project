@@ -374,12 +374,85 @@ def apply_single_record_updates(df: pd.DataFrame, overrides_df: pd.DataFrame) ->
     
     return result_df, stats
 
+def add_nyc_gov_agency_directory_flag(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Add a new column 'NYC.gov Agency Directory' with True/False values based on specified criteria.
+    
+    The criteria for inclusion in the NYC.gov Agency Directory are:
+    1. OperationalStatus IS Active
+    2. AND PreliminaryOrganizationType IS NOT Non-Governmental Organization
+    3. AND PreliminaryOrganizationType IS NOT Division (except for specified divisions)
+    4. AND PreliminaryOrganizationType IS NOT Judiciary
+    5. AND PreliminaryOrganizationType IS NOT Financial Institution
+    6. AND URL DOES NOT CONTAIN "ny.gov"
+    7. AND (URL IS NOT empty OR PrincipalOfficerName IS NOT empty OR PrincipalOfficerContactURL IS NOT empty)
+    
+    Special case: Include Divisions with the following Names:
+    - 311
+    - Department of Homeless Services
+    - Human Resources Administration
+    
+    Args:
+        df: Input DataFrame to update
+        
+    Returns:
+        DataFrame with the new flag column
+    """
+    # Make a copy to avoid modifying the original
+    result_df = df.copy()
+    
+    # Ensure required columns exist and convert to strings if they're not already
+    required_columns = ['OperationalStatus', 'PreliminaryOrganizationType', 'URL', 
+                        'PrincipalOfficerName', 'PrincipalOfficerContactURL', 'Name']
+    
+    for col in required_columns:
+        if col not in result_df.columns:
+            result_df[col] = ''  # Add empty column if it doesn't exist
+        else:
+            result_df[col] = result_df[col].fillna('').astype(str)
+    
+    # Initialize the flag column as False
+    result_df['NYC.gov Agency Directory'] = False
+    
+    # List of division names to include as exceptions
+    exception_divisions = ['311', 'Department of Homeless Services', 'Human Resources Administration']
+    
+    # Apply the criteria to set the flag to True where conditions are met
+    mask = (
+        (result_df['OperationalStatus'] == 'Active') &
+        ~(result_df['PreliminaryOrganizationType'] == 'Non-Governmental Organization') &
+        ~(
+            (result_df['PreliminaryOrganizationType'] == 'Division') & 
+            ~result_df['Name'].isin(exception_divisions)
+        ) &
+        ~(result_df['PreliminaryOrganizationType'] == 'Judiciary') &
+        ~(result_df['PreliminaryOrganizationType'] == 'Financial Institution') &
+        ~(result_df['URL'].str.contains('ny.gov', case=False)) &
+        (
+            (result_df['URL'] != '') |
+            (result_df['PrincipalOfficerName'] != '') |
+            (result_df['PrincipalOfficerContactURL'] != '')
+        )
+    )
+    
+    # Set the flag to True where the mask is True
+    result_df.loc[mask, 'NYC.gov Agency Directory'] = True
+    
+    # Log statistics about the flagged records
+    flagged_count = result_df['NYC.gov Agency Directory'].sum()
+    logger.info(f"Added NYC.gov Agency Directory flag: {flagged_count} out of {len(result_df)} records flagged for inclusion")
+    
+    return result_df
+
 def export_datasets(df: pd.DataFrame):
     """
     Export the full dataset and the clean export.
     """
     # Create exports directory if it doesn't exist
     EXPORTS_DIR.mkdir(parents=True, exist_ok=True)
+    
+    # Add the NYC.gov Agency Directory flag
+    df = add_nyc_gov_agency_directory_flag(df)
     
     # Save the full dataset with all fields
     df.to_csv(FULL_EXPORT_PATH, index=False)
@@ -409,6 +482,7 @@ def export_datasets(df: pd.DataFrame):
         "PrincipalOfficerName",
         "PrincipalOfficerTitle",
         "PrincipalOfficerContactURL",
+        "NYC.gov Agency Directory",  # Add the new column here
         "Name - CPO",
         "Name - Checkbook",
         "Name - Greenbook",
@@ -419,6 +493,10 @@ def export_datasets(df: pd.DataFrame):
         "Name - Ops",
         "Name - WeGov"
     ]
+    
+    # Make sure we only include columns that exist in the DataFrame
+    keep_order = [col for col in keep_order if col in clean_df.columns]
+    
     clean_df = clean_df.reindex(columns=keep_order)
     
     # Save clean export

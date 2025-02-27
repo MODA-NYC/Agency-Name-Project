@@ -28,7 +28,7 @@
 - `src/data_preparation.py` - Data preparation utilities
 - `src/data_loading.py` - Data loading utilities
 - `src/assign_final_ids.py` - Final ID assignment and cleanup for Phase 2.6
-- `src/phase2.6_manual_merge.py` - Applies manual merge instructions to handle special cases in final dataset
+- `src/phase2.6_manual_merge.py` - Applies manual merge instructions and generates NYC.gov Agency Directory flag for final dataset
 
 ### Preprocessing
 - `src/preprocessing/base_processor.py` - Base class for data processors

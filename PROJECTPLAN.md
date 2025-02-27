@@ -237,6 +237,7 @@ The project uses `main.py` as the central orchestrator for all data processing s
 - **Task E4:** Create crosswalk between original source IDs and new final IDs for traceability.
 - **Task E5:** Document limitations of current ID system and requirements for future systematic ID assignment.
 - **Task E6:** Implement manual merge process in `phase2.6_manual_merge.py` to handle special cases requiring manual intervention.
+- **Task E7:** Enhance `phase2.6_manual_merge.py` to add the NYC.gov Agency Directory flag column based on operational status, organization type, URL, and principal officer criteria.
 
 ## Script Consolidation Plans
 - **Plan P1:** Consolidate all scripts into a single main.py file for easier management and execution.

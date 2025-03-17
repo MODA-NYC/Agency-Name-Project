@@ -487,6 +487,7 @@ def export_datasets(df: pd.DataFrame):
         "PrincipalOfficerName",
         "PrincipalOfficerTitle",
         "PrincipalOfficerContactURL",
+        "Notes",
         "InstanceOf",  # Add the new InstanceOf column
         "NYC.gov Agency Directory",
         "Name - CPO",

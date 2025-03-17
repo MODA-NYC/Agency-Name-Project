@@ -49,6 +49,11 @@ def create_clean_export(df: pd.DataFrame) -> pd.DataFrame:
     """
     clean_df = df.copy()
     
+    # Add InstanceOf column if it doesn't exist
+    if 'InstanceOf' not in clean_df.columns:
+        clean_df['InstanceOf'] = ''
+        logger.info("Added 'InstanceOf' column with blank values")
+    
     # Fill missing values with empty strings for string columns
     string_columns = [
         'Name', 'NameAlphabetized', 'OperationalStatus', 'PreliminaryOrganizationType',
@@ -56,7 +61,7 @@ def create_clean_export(df: pd.DataFrame) -> pd.DataFrame:
         'AuthorizingAuthority', 'LegalCitation', 'LegalCitationURL', 'LegalCitationText',
         'LegalName', 'AlternateNames', 'Acronym', 'AlternateAcronyms', 'BudgetCode',
         'OpenDatasetsURL', 'Notes', 'URISlug', 'NameWithAcronym', 'NameAlphabetizedWithAcronym',
-        'RecordID', 'merged_from', 'data_source', 'Description-nyc.gov'
+        'RecordID', 'merged_from', 'data_source', 'Description-nyc.gov', 'InstanceOf'
     ]
     
     # Add optional columns if they exist
@@ -482,7 +487,8 @@ def export_datasets(df: pd.DataFrame):
         "PrincipalOfficerName",
         "PrincipalOfficerTitle",
         "PrincipalOfficerContactURL",
-        "NYC.gov Agency Directory",  # Add the new column here
+        "InstanceOf",  # Add the new InstanceOf column
+        "NYC.gov Agency Directory",
         "Name - CPO",
         "Name - Checkbook",
         "Name - Greenbook",

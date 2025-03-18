@@ -514,6 +514,83 @@ def export_datasets(df: pd.DataFrame):
     clean_df.to_csv(OUTPUT_MANUAL_MERGED, index=False)
     logger.info(f"Clean dataset also saved to {OUTPUT_MANUAL_MERGED} for backward compatibility")
 
+def add_new_records(df: pd.DataFrame, overrides_df: pd.DataFrame) -> Tuple[pd.DataFrame, Dict]:
+    """
+    Add new records from the manual overrides file when the record ID doesn't exist in the dataset.
+    
+    Args:
+        df: Input DataFrame to update
+        overrides_df: DataFrame containing record instructions
+        
+    Returns:
+        Tuple of (updated DataFrame with new records, statistics dictionary)
+    """
+    stats = {
+        'total_new_records': 0,
+        'successful_additions': 0,
+        'failed_additions': 0,
+        'errors': []
+    }
+    
+    # Create working copy of the dataset
+    result_df = df.copy()
+    
+    # Get all record IDs that exist in overrides but not in the dataset
+    existing_record_ids = set(result_df['RecordID'].astype(str))
+    potential_new_record_ids = set(overrides_df['PrimaryRecordID'][overrides_df['SecondaryRecordID'].isna()].astype(str))
+    new_record_ids = potential_new_record_ids - existing_record_ids
+    
+    if not new_record_ids:
+        logger.info("No new records to add")
+        return result_df, stats
+    
+    stats['total_new_records'] = len(new_record_ids)
+    logger.info(f"Found {len(new_record_ids)} new records to add")
+    
+    # Add each new record
+    for record_id in new_record_ids:
+        try:
+            # Get the override instruction for this record
+            override_row = overrides_df[overrides_df['PrimaryRecordID'] == record_id].iloc[0]
+            
+            # Parse the Notes field to get the record attributes
+            if pd.isna(override_row.get('Notes')):
+                stats['failed_additions'] += 1
+                error_msg = f"No Notes field for new record {record_id}, cannot create record"
+                stats['errors'].append(error_msg)
+                logger.warning(error_msg)
+                continue
+                
+            try:
+                record_attrs = json.loads(override_row['Notes'])
+            except json.JSONDecodeError:
+                stats['failed_additions'] += 1
+                error_msg = f"Invalid JSON in Notes field for record {record_id}"
+                stats['errors'].append(error_msg)
+                logger.warning(error_msg)
+                continue
+            
+            # Create a new record
+            new_record = pd.Series({'RecordID': record_id})
+            
+            # Add all attributes from the Notes field
+            for key, value in record_attrs.items():
+                new_record[key] = value
+            
+            # Append the new record to the DataFrame
+            result_df = pd.concat([result_df, pd.DataFrame([new_record])], ignore_index=True)
+            
+            stats['successful_additions'] += 1
+            logger.info(f"Successfully added new record {record_id}")
+            
+        except Exception as e:
+            stats['failed_additions'] += 1
+            error_msg = f"Error adding new record {record_id}: {str(e)}"
+            stats['errors'].append(error_msg)
+            logger.error(error_msg)
+    
+    return result_df, stats
+
 def main():
     """Main execution function"""
     logger.info("Starting Phase 2.6 Manual Merge and Export Process")
@@ -538,7 +615,11 @@ def main():
             logger.error("Error: RecordID column not found in input dataset. Please use a dataset that already has record IDs.")
             return
         
-        # First apply single-record updates (using existing record IDs)
+        # First add new records that don't exist yet
+        logger.info("Adding new records if they don't exist...")
+        df, add_stats = add_new_records(df, overrides_df)
+        
+        # Then apply single-record updates (using existing record IDs)
         logger.info("Applying single-record updates...")
         df, update_stats = apply_single_record_updates(df, overrides_df)
         
@@ -552,6 +633,11 @@ def main():
         updated_df = assign_final_ids(updated_df, id_prefix="FINAL_REC_")
         
         # Log statistics
+        logger.info("\nAddition Statistics:")
+        logger.info(f"Total new records: {add_stats['total_new_records']}")
+        logger.info(f"Successfully added: {add_stats['successful_additions']}")
+        logger.info(f"Failed additions: {add_stats['failed_additions']}")
+        
         logger.info("\nUpdate Statistics:")
         logger.info(f"Total single-record updates: {update_stats['total_updates']}")
         logger.info(f"Successful updates: {update_stats['successful_updates']}")
@@ -563,9 +649,9 @@ def main():
         logger.info(f"Failed merges: {merge_stats['failed_merges']}")
         logger.info(f"Records in final dataset: {len(updated_df)}")
         
-        if update_stats['errors'] or merge_stats['errors']:
+        if add_stats['errors'] or update_stats['errors'] or merge_stats['errors']:
             logger.info("\nErrors encountered:")
-            for error in update_stats['errors'] + merge_stats['errors']:
+            for error in add_stats['errors'] + update_stats['errors'] + merge_stats['errors']:
                 logger.info(f"- {error}")
         
         # Export final datasets (full and clean exports)

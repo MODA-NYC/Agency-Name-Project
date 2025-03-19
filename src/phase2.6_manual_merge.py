@@ -460,7 +460,7 @@ def export_datasets(df: pd.DataFrame):
     df = add_nyc_gov_agency_directory_flag(df)
     
     # Save the full dataset with all fields
-    df.to_csv(FULL_EXPORT_PATH, index=False)
+    df.to_csv(FULL_EXPORT_PATH, index=False, encoding='utf-8')
     logger.info(f"Full dataset export saved to {FULL_EXPORT_PATH}. Row count: {len(df)}")
     
     # Create a clean export: process the dataset, assign final IDs, reorder columns
@@ -507,11 +507,11 @@ def export_datasets(df: pd.DataFrame):
     clean_df = clean_df.reindex(columns=keep_order)
     
     # Save clean export
-    clean_df.to_csv(CLEAN_EXPORT_PATH, index=False)
+    clean_df.to_csv(CLEAN_EXPORT_PATH, index=False, encoding='utf-8')
     logger.info(f"Clean dataset export saved to {CLEAN_EXPORT_PATH}. Row count: {len(clean_df)}")
     
     # Also save the clean export as the final manual merged dataset for backward compatibility
-    clean_df.to_csv(OUTPUT_MANUAL_MERGED, index=False)
+    clean_df.to_csv(OUTPUT_MANUAL_MERGED, index=False, encoding='utf-8')
     logger.info(f"Clean dataset also saved to {OUTPUT_MANUAL_MERGED} for backward compatibility")
 
 def add_new_records(df: pd.DataFrame, overrides_df: pd.DataFrame) -> Tuple[pd.DataFrame, Dict]:
@@ -604,8 +604,8 @@ def main():
     try:
         # Load datasets
         logger.info("Loading datasets...")
-        df = pd.read_csv(INPUT_DATASET)
-        overrides_df = pd.read_csv(MANUAL_OVERRIDES)
+        df = pd.read_csv(INPUT_DATASET, encoding='utf-8')
+        overrides_df = pd.read_csv(MANUAL_OVERRIDES, encoding='utf-8')
         
         logger.info(f"Loaded {len(df)} records from input dataset")
         logger.info(f"Loaded {len(overrides_df)} manual override instructions")

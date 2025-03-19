@@ -200,4 +200,5 @@ FINAL_REC_000252,,"{""PrincipalOfficerContactURL"": ""https://www.nyc.gov/site/o
 FINAL_REC_000371,,"{""PrincipalOfficerContactURL"": ""https://www.nyc.gov/site/olr/about/about-contact-olr.page""}"
 FINAL_REC_000251,,"{""Name - NYC Open Data Portal"": """"}"
 FINAL_REC_000324,,"{""OperationalStatus"": ""Active"", ""Name - HOO"": """", ""AlternateAcronyms"": """", ""BudgetCode"": """", ""OpenDatasetsURL"": """", ""FoundingYear"": """", ""PrincipalOfficerContactURL"": """", ""Name - NYC Open Data Portal"": """", ""Name - ODA"": """"}"
-FINAL_REC_000368,,"{""AlternateNames"": """", ""AlternateAcronyms"": ""MOIP""}" 
+FINAL_REC_000368,,"{""AlternateNames"": """", ""AlternateAcronyms"": ""MOIP""}"
+FINAL_REC_000476,,"{""Name"": ""Metropolitan Transportation Authority"", ""NameAlphabetized"": ""Metropolitan Transportation Authority"", ""OperationalStatus"": ""Active"", ""PreliminaryOrganizationType"": ""Authority or Public Benefit Corporation"", ""URL"": ""https://new.mta.info/"", ""Acronym"": ""MTA"", ""BudgetCode"": ""998"", ""OpenDatasetsURL"": ""https://data.cityofnewyork.us/browse?Dataset-Information_Agency=Metropolitan+Transportation+Authority+%28MTA%29"", ""FoundingYear"": ""1965"", ""Name - NYC Open Data Portal"": ""Metropolitan Transportation Authority (MTA)"", ""Name - ODA"": ""Metropolitan Transportation Authority (MTA)""}" 

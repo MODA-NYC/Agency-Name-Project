@@ -1,3 +1,6 @@
+# ⚠️ Archived — superseded by NYC Governance Organizations (NYC GO)
+# Active code and data now live here: [[new repo link]](https://github.com/MODA-NYC/nyc-governance-organizations). This repo remains for historical context and prototypes.
+
 # NYC Agency Name Standardization Project
 
 ## Overview
